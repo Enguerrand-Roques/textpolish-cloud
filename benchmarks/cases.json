@@ -1,0 +1,62 @@
+[
+  {
+    "id": "fr_pro_short",
+    "label": "Short email with errors",
+    "mode": "pro",
+    "input_text": "bonjour, je voudrais savoir si vous avez bien recu mon dossier car jai pas eu de nouvelle depuis 2 semaine. merci de me repondre rapidement."
+  },
+  {
+    "id": "fr_pro_long",
+    "label": "Long justification email",
+    "mode": "pro",
+    "input_text": "Bonjour, je voulais vous prévenir que nous n'allons probablement pas tenir la date annoncée initialement pour la livraison de la fonctionnalité. En fait en regardant plus en détail on s'est rendu compte qu'il y avait plusieurs dépendances techniques qui n'avaient pas été anticipées, notamment sur la partie synchronisation et sur les droits utilisateurs. On essaye de rattraper mais si on force maintenant on risque surtout de livrer quelque chose de fragile. L'idée serait plutot de décaler de quelques jours pour sécuriser les tests et éviter un incident derrière."
+  },
+  {
+    "id": "fr_pro_linkedin",
+    "label": "Informal LinkedIn message",
+    "mode": "pro",
+    "input_text": "Salut, j'ai vu ton profil et je pense qu'on pourrait faire des trucs cool ensemble, t'as 5min pour qu'on se parle?"
+  },
+  {
+    "id": "fr_casual_sms",
+    "label": "SMS with typical typos",
+    "mode": "casual",
+    "input_text": "slt tu fait quoi ce soir ? on peut se retrouver genre vers 19h pour manger un truc ?"
+  },
+  {
+    "id": "fr_casual_long",
+    "label": "Long transcribed voice message",
+    "mode": "casual",
+    "input_text": "franchement la journée a ete trop bizarre au debut ca allait puis apres ya eu cette reunion inutile qui a duré mille ans ensuite jai raté mon metro et quand je suis enfin rentré jai vu ton message donc oui jsuis un peu saoulé mais si tu veux on s'appelle plus tard ca me fera du bien de parler d'autre chose"
+  },
+  {
+    "id": "fr_casual_abbrev",
+    "label": "Message full of abbreviations",
+    "mode": "casual",
+    "input_text": "tkt c bon g geré, jte redis ds 10 min"
+  },
+  {
+    "id": "en_pro_followup",
+    "label": "English professional follow-up",
+    "mode": "pro",
+    "input_text": "hi just checking in on the proposal i sent last week, let me know if you need anything else from my end thanks"
+  },
+  {
+    "id": "en_pro_long",
+    "label": "English status update with errors",
+    "mode": "pro",
+    "input_text": "Hello team, we made good progress on the migration but there is still some blockers on the infra side and we probably need one more day before saying it is fully stable."
+  },
+  {
+    "id": "en_casual_sms",
+    "label": "English casual text message",
+    "mode": "casual",
+    "input_text": "hey r u coming tmrw?? lmk asap bc i need to book the table thx"
+  },
+  {
+    "id": "en_casual_long",
+    "label": "English casual long message",
+    "mode": "casual",
+    "input_text": "honestly today was so weird first it was fine but then there was this pointless meeting that took forever and i missed my train so when i finally got home i saw your message so yeah im a bit done but if you want we can call later it would be nice to talk about something else"
+  }
+]

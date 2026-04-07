@@ -1,0 +1,4 @@
+pynput==1.7.7
+pyperclip>=1.8.2
+pyobjc-framework-Cocoa>=10.0
+google-genai>=1.0.0

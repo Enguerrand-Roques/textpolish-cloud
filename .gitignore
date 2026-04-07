@@ -1,0 +1,13 @@
+config.py
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+*.egg-info/
+dist/
+build/
+.claude/
+CLAUDE.md
+benchmarks/results/
