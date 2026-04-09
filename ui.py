@@ -278,7 +278,7 @@ class TextPolishPanel(NSObject):
         def status_worker():
             steps = [
                 (1.0,   "Preparing correction"),
-                (3.0,   "Loading local model"),
+                (3.0,   "Calling Gemini"),
                 (6.0,   "Rewriting text"),
                 (9999.0, "Finalising response"),
             ]

@@ -95,6 +95,8 @@ cat > "$APP/Contents/Info.plist" << 'PLIST'
     <string>com.user.textpolish-cloud</string>
     <key>CFBundleName</key>
     <string>TextPolish Cloud</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleVersion</key>
@@ -104,6 +106,10 @@ cat > "$APP/Contents/Info.plist" << 'PLIST'
 </dict>
 </plist>
 PLIST
+
+if [ -f "$REPO_DIR/AppIcon.icns" ]; then
+    cp "$REPO_DIR/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+fi
 
 find "$APP" -exec xattr -c {} \; 2>/dev/null
 codesign --force --deep --sign - "$APP" 2>/dev/null || true

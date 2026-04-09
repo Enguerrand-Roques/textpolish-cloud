@@ -3,7 +3,7 @@
 
 set -e
 
-VENV=".venv"
+VENV="venv"
 
 if [ ! -d "$VENV" ]; then
     echo "Creating virtual environment..."
