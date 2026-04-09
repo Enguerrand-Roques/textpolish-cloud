@@ -1,6 +1,6 @@
 """
 Clipboard and text selection utilities.
-Uses pynput (Accessibility) for keystrokes and NSWorkspace for app management.
+Uses pynput for keystrokes and NSWorkspace / Quartz for app management.
 """
 
 import sys
@@ -11,12 +11,21 @@ from pynput.keyboard import Controller, Key
 
 if sys.platform == "darwin":
     from AppKit import NSWorkspace  # type: ignore
+    from Quartz import (  # type: ignore
+        CGEventCreateKeyboardEvent,
+        CGEventSetFlags,
+        CGEventPostToPid,
+        kCGEventFlagMaskCommand,
+    )
 elif sys.platform == "win32":
     import ctypes
     import ctypes.wintypes
 
 _kbd = Controller()
 _MOD = Key.cmd if sys.platform == "darwin" else Key.ctrl
+
+# macOS keycode for 'v'
+_KEYCODE_V = 9
 
 
 def get_frontmost_app():
@@ -69,40 +78,57 @@ def get_app_and_copy() -> tuple[object, str]:
     return app_ref, text
 
 
-def _force_focus_macos(app_ref) -> None:
-    """Bring the source app back to front, even if the user switched away."""
-    # NSApplicationActivateIgnoringOtherApps = 1
-    # Without this flag, activation is ignored when another app is active.
-    app_ref.activateWithOptions_(1)
-    time.sleep(0.35)
-
-
-def _force_focus_windows(hwnd: int) -> None:
-    """Bring the source window back to front on Windows."""
-    user32 = ctypes.windll.user32
-    # Restore the window if minimized, then force it to the foreground.
-    user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-    user32.SetForegroundWindow(hwnd)
-    time.sleep(0.35)
-
-
-def paste_text(text: str, app_ref=None) -> None:
+def _paste_to_pid(pid: int) -> None:
     """
-    Write *text* to the clipboard, restore focus to the source app,
-    then simulate Cmd/Ctrl+V.
+    Send Cmd+V directly to a process by PID without changing focus.
+    The user stays on whatever app they switched to — the paste happens
+    silently in the background inside the target app.
     """
-    logging.debug("Pasting (%d chars)", len(text))
-    pyperclip.copy(text)
+    for key_down in (True, False):
+        event = CGEventCreateKeyboardEvent(None, _KEYCODE_V, key_down)
+        CGEventSetFlags(event, kCGEventFlagMaskCommand)
+        CGEventPostToPid(pid, event)
     time.sleep(0.05)
 
-    if app_ref is not None:
-        if sys.platform == "darwin":
-            _force_focus_macos(app_ref)
-        elif sys.platform == "win32":
-            _force_focus_windows(app_ref)
+
+def _paste_windows(hwnd: int) -> None:
+    """
+    On Windows, bring the source window to the foreground then send Ctrl+V.
+    CGEventPostToPid has no equivalent on Windows, so focus must be restored.
+    """
+    user32 = ctypes.windll.user32
+    user32.ShowWindow(hwnd, 9)   # SW_RESTORE — unminimize if needed
+    user32.SetForegroundWindow(hwnd)
+    time.sleep(0.35)
 
     with _kbd.pressed(_MOD):
         _kbd.press('v')
         _kbd.release('v')
 
-    logging.debug("Cmd/Ctrl+V sent")
+
+def paste_text(text: str, app_ref=None) -> None:
+    """
+    Write *text* to the clipboard, then paste it into the source app.
+
+    macOS: sends Cmd+V directly to the source process — no focus change,
+           the user stays on whatever they switched to.
+    Windows: restores focus to the source window, then sends Ctrl+V.
+    """
+    logging.debug("Pasting (%d chars)", len(text))
+    pyperclip.copy(text)
+    time.sleep(0.05)
+
+    if app_ref is None:
+        # Fallback: paste into whatever is currently focused
+        with _kbd.pressed(_MOD):
+            _kbd.press('v')
+            _kbd.release('v')
+        return
+
+    if sys.platform == "darwin":
+        pid = app_ref.processIdentifier()
+        _paste_to_pid(pid)
+    elif sys.platform == "win32":
+        _paste_windows(app_ref)
+
+    logging.debug("Paste sent")
