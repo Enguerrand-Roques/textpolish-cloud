@@ -3,18 +3,24 @@ Clipboard and text selection utilities.
 Uses pynput (Accessibility) for keystrokes and NSWorkspace for app management.
 """
 
+import sys
 import time
 import logging
 import pyperclip
 from pynput.keyboard import Controller, Key
-from AppKit import NSWorkspace  # type: ignore
+
+if sys.platform == "darwin":
+    from AppKit import NSWorkspace  # type: ignore
 
 _kbd = Controller()
+_MOD = Key.cmd if sys.platform == "darwin" else Key.ctrl
 
 
 def get_frontmost_app():
-    """Return the running NSRunningApplication object for the active app."""
-    return NSWorkspace.sharedWorkspace().frontmostApplication()
+    """Return the running NSRunningApplication object for the active app (macOS only)."""
+    if sys.platform == "darwin":
+        return NSWorkspace.sharedWorkspace().frontmostApplication()
+    return None
 
 
 def get_app_and_copy() -> tuple[object, str]:
@@ -31,7 +37,7 @@ def get_app_and_copy() -> tuple[object, str]:
     except Exception:
         before = ""
 
-    with _kbd.pressed(Key.cmd):
+    with _kbd.pressed(_MOD):
         _kbd.press('c')
         _kbd.release('c')
 
@@ -63,7 +69,7 @@ def paste_text(text: str, app_ref=None) -> None:
         app_ref.activateWithOptions_(0)
         time.sleep(0.25)
 
-    with _kbd.pressed(Key.cmd):
+    with _kbd.pressed(_MOD):
         _kbd.press('v')
         _kbd.release('v')
 
