@@ -208,6 +208,8 @@ Building it surfaced a few things that tutorials don't really cover:
 - **The API is the easy part** — calling Gemini takes 10 lines of code. The complexity was everywhere else: global shortcuts, clipboard handling, making a window appear above fullscreen apps, pasting into the right window without disrupting focus.
 - **Cloud vs. local** — no setup friction for the user (no Ollama, no model download), but you're dependent on internet and a third-party service. The right choice depends on who your users are.
 
+Beyond the technical side, this project was also an exercise in building something the way a real open source project is built — using Conventional Commits (`feat:`, `fix:`, `chore:`...), maintaining a proper `LICENSE`, writing a README that someone else can actually follow, and structuring code so it makes sense to a stranger reading it on GitHub. Small habits that make a big difference when a project grows or gets contributors.
+
 The companion project [TextPolish](https://github.com/Enguerrand-Roques/textpolish) explores the same use case but with a fully local Ollama model — no internet, no API key, at the cost of more setup.
 
 ---
