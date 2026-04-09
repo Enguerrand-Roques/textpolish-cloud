@@ -197,6 +197,21 @@ textpolish-cloud/
 
 ---
 
+## Background
+
+This project started as a way to understand how to use a cloud AI API in a real personal tool — not just a demo, but something actually usable every day.
+
+Building it surfaced a few things that tutorials don't really cover:
+
+- **API latency in practice** — Gemini Flash responds in 1–3s for short texts. Fast enough to feel instant, but you still need a status indicator so the user knows something is happening.
+- **Free tier limits are real constraints** — 1 500 requests/day sounds like a lot until you use the tool heavily. Choosing the right model (`flash-lite` vs `flash`) is a real product decision, not just a performance one.
+- **The API is the easy part** — calling Gemini takes 10 lines of code. The complexity was everywhere else: global shortcuts, clipboard handling, making a window appear above fullscreen apps, pasting into the right window without disrupting focus.
+- **Cloud vs. local** — no setup friction for the user (no Ollama, no model download), but you're dependent on internet and a third-party service. The right choice depends on who your users are.
+
+The companion project [TextPolish](https://github.com/Enguerrand-Roques/textpolish) explores the same use case but with a fully local Ollama model — no internet, no API key, at the cost of more setup.
+
+---
+
 ## Related
 
 - [TextPolish](https://github.com/Enguerrand-Roques/textpolish) — same tool, runs fully offline with a local Ollama model
