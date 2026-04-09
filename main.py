@@ -1,9 +1,9 @@
 import sys
 
 if sys.platform == "darwin":
-    from main_macos import main
+    from platforms.macos.main import main
 elif sys.platform == "win32":
-    from main_windows import main
+    from platforms.windows.main import main
 else:
     raise RuntimeError(f"Unsupported platform: {sys.platform}")
 

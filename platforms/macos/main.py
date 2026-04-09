@@ -1,12 +1,11 @@
-#!/usr/bin/env python3
 """
-TextPolish — main entry point.
+TextPolish Cloud — macOS entry point.
 
 Starts a global shortcut listener (Cmd+Shift+P) and displays a native NSPanel
 that stays visible above all windows, including fullscreen apps.
 
 Required macOS permissions:
-  - Accessibility  (for pynput / GlobalHotKeys)
+  - Accessibility  (for CGEventTap)
   - Automation     (for osascript / keystroke)
 """
 
@@ -22,25 +21,21 @@ from AppKit import (
 )
 
 from config import SHORTCUT
-from hotkey import install as install_hotkey
-from ui import setup as setup_panel
+from platforms.macos.hotkey import install as install_hotkey
+from platforms.macos.ui import setup as setup_panel
 
 
 def main() -> None:
     NSApplication.sharedApplication()
     NSApp.setActivationPolicy_(NSApplicationActivationPolicyAccessory)
-    # Required before manually dispatching events
     NSApp.finishLaunching()
 
     panel = setup_panel()
-
     install_hotkey(SHORTCUT, panel.trigger_polish)
 
-    print(f"TextPolish started — shortcut active: {SHORTCUT}")
+    print(f"TextPolish Cloud started — shortcut active: {SHORTCUT}")
     print("Press Ctrl+C in this terminal to quit.")
 
-    # Full Cocoa run loop: dispatches NSEvents (clicks, keyboard, etc.)
-    # 0.5s timeout so Python can catch KeyboardInterrupt (Ctrl+C).
     try:
         while True:
             event = NSApp.nextEventMatchingMask_untilDate_inMode_dequeue_(
@@ -55,7 +50,3 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
