@@ -1,5 +1,7 @@
 # TextPolish Cloud
 
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+
 **TextPolish Cloud** polishes your text using Google Gemini — free, fast, no local model needed.
 
 Select text in any app, press a shortcut, pick a rewrite mode, and the corrected text is pasted back instantly. Runs silently in the menubar / system tray.
