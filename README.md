@@ -1,96 +1,131 @@
 # TextPolish Cloud
 
-TextPolish Cloud is a macOS menubar helper that grabs the currently selected text, sends it to Google Gemini for rewriting, and pastes the polished version back into the active app.
+**TextPolish Cloud** is a macOS menubar utility that polishes your text using Google Gemini. Select any text in any app, press a shortcut, choose a rewrite mode — the corrected text is pasted back instantly.
 
-It keeps the native macOS flow from the original TextPolish project while replacing the local Ollama backend with a cloud-based Gemini API call.
+No local model required. Just a free Gemini API key.
 
-## Features
+---
 
-- Global macOS shortcut to trigger rewriting
-- Native `NSPanel` UI that stays visible above fullscreen apps
-- Google Gemini backend via `google-genai`
-- Prompt modes in `prompts/` (`pro`, `casual`, `custom`)
-- Clipboard-based capture and paste workflow
+## How It Works
+
+1. Select text in any macOS app
+2. Press `Cmd+Shift+P`
+3. Pick a mode — **Professional**, **Casual**, or **Custom**
+4. The rewritten text is automatically pasted back
+
+TextPolish Cloud runs silently in the menubar. No Dock icon, no Terminal window.
+
+---
 
 ## Requirements
 
-- macOS
-- Python 3.13 recommended
-- A Google Gemini API key from https://aistudio.google.com
-- Accessibility permission for the global hotkey and copy/paste automation
+- macOS 13+
+- Python 3.13
+- A **free** Google Gemini API key → [Get one at aistudio.google.com](https://aistudio.google.com)
+- macOS **Accessibility** permission (for the global shortcut and clipboard automation)
+
+---
 
 ## Installation
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp config.example.py config.py
+git clone https://github.com/Enguerrand-Roques/textpolish-cloud.git
+cd textpolish-cloud
+bash setup.sh
 ```
 
-Then edit `config.py` and set your Gemini API key.
+`setup.sh` handles everything automatically:
+- Creates the Python virtual environment
+- Installs dependencies
+- Creates `config.py` from the template
+- Registers the macOS Launch Agent
+- Creates **TextPolishCloud.app** on your Desktop
+
+Then open `config.py` and paste your Gemini API key:
+
+```python
+GEMINI_API_KEY = "your-key-here"
+```
+
+---
+
+## Daily Use
+
+**Start:** Double-click **TextPolishCloud.app** on your Desktop.  
+A ✏️ icon appears in the menubar — that means it's running.
+
+**Stop:** Click the ✏️ icon → **Quit TextPolish Cloud**.
+
+**Auto-start on login:** In `~/Library/LaunchAgents/com.user.textpolish-cloud.plist`, set `RunAtLoad` to `<true/>`, then re-run `bash setup.sh`.
+
+---
 
 ## Configuration
 
-Example configuration:
+Edit `config.py` (excluded from Git):
 
 ```python
-GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE"
-GEMINI_MODEL = "gemini-2.5-flash-lite"
-SHORTCUT = "<cmd>+<shift>+p"
+GEMINI_API_KEY = "your-key-here"
+GEMINI_MODEL   = "gemini-2.5-flash-lite"   # free and fast
+SHORTCUT       = "<cmd>+<shift>+p"
 ```
 
-Config values:
+Available models (all free tier):
+- `gemini-2.5-flash-lite` — fastest, recommended
+- `gemini-2.5-flash` — higher quality, slightly slower
+- `gemini-2.0-flash` — good alternative
 
-- `GEMINI_API_KEY`: required API key for Gemini
-- `GEMINI_MODEL`: Gemini model used for rewriting
-- `SHORTCUT`: global keyboard shortcut in `pynput` format
-
-`config.py` is intentionally excluded from Git.
-
-## Run
-
-```bash
-./run.sh
-```
-
-Or manually:
-
-```bash
-python3 main.py
-```
-
-When the app starts, use the configured shortcut to capture the selected text and open the panel.
+---
 
 ## macOS Permissions
 
-On first launch, make sure the terminal or Python app you use has:
+On first launch, macOS will ask for:
 
-- Accessibility permission
-- Permission to control the keyboard / simulate copy-paste when prompted
+- **Accessibility** — required for the global shortcut and simulated copy/paste
+- **Input Monitoring** — may be requested alongside Accessibility
 
-Without these permissions, the global shortcut or paste-back step may fail.
+Grant both in **System Settings → Privacy & Security**.
 
-## How It Works
+---
 
-1. Select text in any macOS app.
-2. Press the configured shortcut.
-3. TextPolish Cloud copies the current selection.
-4. The text is sent to Gemini with the selected prompt mode.
-5. The rewritten text is pasted back into the original app.
+## Rewrite Modes
+
+| Mode | Description |
+|------|-------------|
+| Professional | Full rewrite for emails, reports, LinkedIn posts |
+| Casual | Light typo fix, keeps your tone (SMS, WhatsApp, DMs) |
+| Custom | Free-form instruction you type in the panel |
+
+---
 
 ## Project Structure
 
-- `main.py`: Cocoa app bootstrap and event loop
-- `ui.py`: native `NSPanel` interface and rewrite actions
-- `hotkey.py`: global hotkey listener based on Quartz `CGEventTap`
-- `clipboard.py`: selected text capture and paste-back helpers
-- `llm.py`: Gemini request layer
-- `prompts/`: prompt templates for each rewrite mode
-- `config.example.py`: example local configuration
-- `run.sh`: bootstrap script that creates the virtualenv on first launch
+```
+textpolish-cloud/
+├── main.py          # Cocoa app bootstrap and event loop
+├── ui.py            # NSPanel UI + menubar status item
+├── hotkey.py        # Global shortcut via CGEventTap
+├── clipboard.py     # Selected text capture and paste-back
+├── llm.py           # Gemini request layer
+├── prompts/         # Prompt templates (pro, casual, custom)
+├── config.py        # Local config — excluded from Git
+├── config.example.py
+└── setup.sh         # One-command installer
+```
 
-## Notes
+---
 
-- `benchmark_models.py` is inherited from the original local-model project and is not yet migrated to the Gemini backend.
-- No API key or local config file is committed in this repository.
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `Invalid API key` | Double-check your key in `config.py` |
+| Shortcut not detected | Grant Accessibility in System Settings |
+| Text not pasted back | Keep the source app focused; allow clipboard permissions |
+| App won't start | Check `/tmp/textpolish-cloud.log` for errors |
+
+---
+
+## Related
+
+- [TextPolish](https://github.com/Enguerrand-Roques/textpolish) — same tool, runs fully offline with a local Ollama model

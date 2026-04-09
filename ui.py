@@ -26,6 +26,11 @@ from AppKit import (
     NSWindowCollectionBehaviorCanJoinAllSpaces,
     NSWindowCollectionBehaviorFullScreenAuxiliary,
     NSFloatingWindowLevel,
+    NSStatusBar,
+    NSVariableStatusItemLength,
+    NSMenu,
+    NSMenuItem,
+    NSImage,
 )
 
 from clipboard import get_app_and_copy, paste_text
@@ -393,6 +398,31 @@ class TextPolishPanel(NSObject):
 
 def setup() -> TextPolishPanel:
     """Initialize bridge and panel. Must be called from the main thread."""
-    global _bridge
+    global _bridge, _status_item
     _bridge = _MainThreadBridge.alloc().init()
+    _status_item = _create_status_item()
     return TextPolishPanel.alloc().init()
+
+
+def _create_status_item():
+    bar = NSStatusBar.systemStatusBar()
+    item = bar.statusItemWithLength_(NSVariableStatusItemLength)
+
+    img = NSImage.imageWithSystemSymbolName_accessibilityDescription_("pencil", "TextPolish Cloud")
+    if img is not None:
+        img.setTemplate_(True)
+        item.button().setImage_(img)
+    else:
+        item.button().setTitle_("✏️")
+    item.button().setToolTip_("TextPolish Cloud")
+
+    menu = NSMenu.alloc().init()
+    quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+        "Quit TextPolish Cloud", "terminate:", "q"
+    )
+    menu.addItem_(quit_item)
+    item.setMenu_(menu)
+    return item
+
+
+_status_item = None
