@@ -1,6 +1,7 @@
 # TextPolish Cloud
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![Tests](https://github.com/Enguerrand-Roques/textpolish-cloud/actions/workflows/tests.yml/badge.svg)
 
 **TextPolish Cloud** polishes your text using Google Gemini — free, fast, no local model needed.
 
