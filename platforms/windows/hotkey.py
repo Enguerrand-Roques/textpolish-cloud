@@ -14,7 +14,7 @@ def install(shortcut: str, callback) -> None:
         shortcut: pynput format, e.g. "<cmd>+<shift>+p"
         callback: Function called (from a daemon thread) when the shortcut fires.
     """
-    win_shortcut = shortcut.replace("<cmd>", "<ctrl>")
+    win_shortcut = shortcut.replace("<cmd>", "<ctrl>") if "<cmd>" in shortcut else shortcut
 
     hotkeys = _keyboard.GlobalHotKeys({win_shortcut: callback})
     hotkeys.daemon = True

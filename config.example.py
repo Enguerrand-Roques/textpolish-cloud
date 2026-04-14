@@ -8,4 +8,9 @@ GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE"
 GEMINI_MODEL = "gemini-2.5-flash-lite"
 
 # Global keyboard shortcut (pynput format)
+# macOS: <cmd> = Command key
 SHORTCUT = "<cmd>+<shift>+p"
+
+# Windows override — Ctrl+Shift+P conflicts with many apps (VS Code, browsers…)
+# Uses <ctrl>+<alt>+p by default. Set to None to fall back to SHORTCUT.
+SHORTCUT_WINDOWS = "<ctrl>+<alt>+p"
