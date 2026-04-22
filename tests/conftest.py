@@ -6,8 +6,12 @@ Injects synthetic modules so llm.py can be imported in CI without:
 - the google-genai SDK installed
 """
 
+import os
 import sys
 import types as _types
+
+# Add project root to sys.path so `import llm` works in CI
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from unittest.mock import MagicMock
 
 # --- Synthetic config module ---
