@@ -27,7 +27,12 @@ def _load_prompt(name: str) -> str:
         return f.read().strip()
 
 
-def polish_text(text: str, mode: str = "pro", custom_prompt: str | None = None) -> str:
+def polish_text(
+    text: str,
+    mode: str = "pro",
+    custom_prompt: str | None = None,
+    on_token=None,
+) -> str:
     """
     Send *text* to Gemini and return the corrected version.
 
@@ -35,6 +40,9 @@ def polish_text(text: str, mode: str = "pro", custom_prompt: str | None = None) 
         text:          The raw text to polish.
         mode:          "pro" | "casual" — selects the matching prompt file.
         custom_prompt: If provided, applied through the custom prompt template.
+        on_token:      Optional callback(token: str) called for each streamed
+                       token. When provided, streaming mode is used. The full
+                       result is still returned at the end.
 
     Returns:
         The polished text string.
@@ -56,13 +64,26 @@ def polish_text(text: str, mode: str = "pro", custom_prompt: str | None = None) 
     else:
         user_message = f"{system}\n\nText to rewrite:\n{text}"
 
-    logging.debug("Calling Gemini | model=%s | mode=%s | %d chars", GEMINI_MODEL, mode, len(text))
+    logging.debug("Calling Gemini | model=%s | mode=%s | %d chars | stream=%s",
+                  GEMINI_MODEL, mode, len(text), on_token is not None)
 
-    response = _client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=user_message,
-    )
+    if on_token is not None:
+        parts: list[str] = []
+        for chunk in _client.models.generate_content_stream(
+            model=GEMINI_MODEL,
+            contents=user_message,
+        ):
+            token = chunk.text or ""
+            if token:
+                on_token(token)
+                parts.append(token)
+        result = "".join(parts).strip()
+    else:
+        response = _client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=user_message,
+        )
+        result = response.text.strip()
 
-    result = response.text.strip()
     logging.debug("Response received — %d chars", len(result))
     return result

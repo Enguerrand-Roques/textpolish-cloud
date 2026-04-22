@@ -11,6 +11,21 @@ Select text in any app, press a shortcut, pick a rewrite mode, and the corrected
 
 ---
 
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| **Three rewrite modes** | Professional (full rewrite), Casual (light touch, keeps tone), Custom (any instruction) |
+| **Streaming output** | Corrected text appears word by word as Gemini generates — no waiting for the full response |
+| **Correction history** | Last 10 corrections available in the ✏️ menu → History. Click any entry to copy |
+| **Fully private prompts** | Your text is sent to Gemini only during the request — no logging, no storage |
+| **System-level** | Works in any app — VS Code, Notion, Mail, Slack. Panel stays above fullscreen apps |
+| **Free tier** | 1 500 requests/day on Gemini free tier — no credit card required |
+
+Shortcut: **Cmd+Option+G** (macOS) · **Ctrl+Alt+G** (Windows)
+
+---
+
 ## Get a free API key
 
 Before installing, grab a free Gemini API key — no credit card required:

@@ -75,3 +75,29 @@ class TestPolishText:
     def test_whitespace_only_text_returned_as_is(self):
         result = polish_text("\n\t  ")
         assert result == "\n\t  "
+
+    def test_streaming_calls_on_token_for_each_token(self):
+        """on_token callback must be called once per non-empty chunk."""
+        chunk1, chunk2, chunk3 = MagicMock(), MagicMock(), MagicMock()
+        chunk1.text = "Hello"
+        chunk2.text = " world"
+        chunk3.text = ""  # empty chunk — should not call on_token
+
+        tokens: list[str] = []
+        with patch.object(llm._client.models, "generate_content_stream",
+                          return_value=iter([chunk1, chunk2, chunk3])):
+            polish_text("Hi", mode="casual", on_token=tokens.append)
+
+        assert tokens == ["Hello", " world"]
+
+    def test_streaming_returns_concatenated_result(self):
+        """polish_text must return the full concatenated + stripped result when streaming."""
+        chunk1, chunk2 = MagicMock(), MagicMock()
+        chunk1.text = "  Fixed"
+        chunk2.text = " text.  "
+
+        with patch.object(llm._client.models, "generate_content_stream",
+                          return_value=iter([chunk1, chunk2])):
+            result = polish_text("broken text", mode="pro", on_token=lambda t: None)
+
+        assert result == "Fixed text."

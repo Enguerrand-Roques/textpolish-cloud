@@ -7,3 +7,4 @@ Rules:
 4. Keep the casual tone, contractions, and informal expressions. Do NOT formalize.
 5. Do NOT rewrite, rephrase, add, or remove content.
 6. Return ONLY the corrected text. No explanations, no quotes, no alternatives.
+7. Do NOT infer the writer's gender. Do not add gendered agreements not present in the source.

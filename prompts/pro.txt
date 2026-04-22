@@ -8,3 +8,4 @@ Rules:
 5. Use a formal tone appropriate for professional contexts.
 6. Do NOT shorten the text unless required for clarity.
 7. Return ONLY the rewritten text. No explanations, no quotes, no alternatives.
+8. Do NOT infer the writer's gender. If the original text is gender-ambiguous, keep formulations neutral — do not add gendered adjectives or agreements not present in the source.
