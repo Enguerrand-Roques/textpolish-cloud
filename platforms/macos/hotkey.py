@@ -28,21 +28,18 @@ from Quartz import (
     kCGEventFlagMaskControl,
 )
 
-# macOS keycodes for a-z
-_KEY_CODES: dict[str, int] = {
-    'a': 0,  's': 1,  'd': 2,  'f': 3,  'h': 4,  'g': 5,  'z': 6,  'x': 7,
-    'c': 8,  'v': 9,  'b': 11, 'q': 12, 'w': 13, 'e': 14, 'r': 15, 'y': 16,
-    't': 17, 'o': 31, 'u': 32, 'i': 34, 'p': 35, 'l': 37, 'j': 38, 'k': 40,
-    'n': 45, 'm': 46,
-}
+from platforms.macos.shortcut_parser import (
+    MODIFIER_MAP as _MODIFIER_MAP,
+    parse_shortcut as _parse_shortcut,
+)
 
-_MODIFIER_MAP: dict[str, int] = {
+assert _MODIFIER_MAP == {
     'cmd':    kCGEventFlagMaskCommand,
     'shift':  kCGEventFlagMaskShift,
     'alt':    kCGEventFlagMaskAlternate,
     'option': kCGEventFlagMaskAlternate,
     'ctrl':   kCGEventFlagMaskControl,
-}
+}, "shortcut_parser.MODIFIER_MAP is out of sync with Quartz's CGEventFlags"
 
 # Relevant modifier mask (ignores CapsLock, NumLock, etc.)
 _MOD_MASK = (
@@ -53,33 +50,15 @@ _MOD_MASK = (
 )
 
 
-def _parse_shortcut(shortcut: str) -> tuple[int, int]:
-    """
-    Parse a pynput-style shortcut (e.g. "<cmd>+<shift>+p")
-    and return (modifier_mask, keycode).
-    """
-    modifiers = 0
-    keycode = None
-    for part in shortcut.split('+'):
-        part = part.strip().strip('<>').lower()
-        if part in _MODIFIER_MAP:
-            modifiers |= _MODIFIER_MAP[part]
-        elif part in _KEY_CODES:
-            keycode = _KEY_CODES[part]
-        else:
-            raise ValueError(f"Unrecognised key: {part!r}")
-    if keycode is None:
-        raise ValueError(f"No main key found in shortcut: {shortcut!r}")
-    return modifiers, keycode
-
-
-def install(shortcut: str, callback) -> None:
+def install(shortcut: str, callback, *, on_permission_denied=None) -> None:
     """
     Install a global keyboard shortcut.
 
     Args:
         shortcut: pynput format, e.g. "<cmd>+<shift>+p"
         callback: Function called (from a daemon thread) when the shortcut fires.
+        on_permission_denied: Called (from a daemon thread) if the Accessibility
+            permission is missing and the event tap could not be created.
     """
     target_mods, target_keycode = _parse_shortcut(shortcut)
 
@@ -108,6 +87,11 @@ def install(shortcut: str, callback) -> None:
                 "[hotkey] Could not create event tap.\n"
                 "→ Check Accessibility permissions in System Settings."
             )
+            if on_permission_denied is not None:
+                try:
+                    on_permission_denied()
+                except Exception as e:
+                    print(f"[hotkey] on_permission_denied callback failed: {e}")
             return
 
         source = CFMachPortCreateRunLoopSource(None, tap, 0)

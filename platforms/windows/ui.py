@@ -2,10 +2,6 @@
 TextPolish panel — Windows implementation using PyQt6.
 """
 
-import datetime
-import threading
-import time
-
 from PyQt6.QtWidgets import (
     QApplication,
     QWidget,
@@ -23,6 +19,8 @@ from PyQt6.QtGui import QIcon, QPixmap, QPainter, QFont, QColor
 
 from clipboard import get_app_and_copy, paste_text
 from llm import polish_text
+from history import CorrectionHistory, format_menu_label, format_tooltip
+from polish_job import PolishJobRunner
 
 
 # ---------------------------------------------------------------------------
@@ -52,15 +50,19 @@ def _on_main(fn):
 # History — last 10 corrections (in-memory)
 # ---------------------------------------------------------------------------
 
-_history: list[dict] = []
+_history = CorrectionHistory()
 _history_menu: QMenu | None = None
+
+_STATUS_STEPS = [
+    (1.0,    "Preparing correction"),
+    (3.0,    "Calling Gemini"),
+    (6.0,    "Rewriting text"),
+    (9999.0, "Finalising response"),
+]
 
 
 def _add_to_history(original: str, corrected: str, mode: str) -> None:
-    global _history
-    ts = datetime.datetime.now().strftime("%H:%M")
-    _history.insert(0, {"original": original, "corrected": corrected, "mode": mode, "ts": ts})
-    _history = _history[:10]
+    _history.add(original, corrected, mode)
     _update_history_menu()
 
 
@@ -68,17 +70,13 @@ def _update_history_menu() -> None:
     if _history_menu is None:
         return
     _history_menu.clear()
-    if not _history:
+    if not _history.entries:
         act = _history_menu.addAction("No corrections yet")
         act.setEnabled(False)
         return
-    for entry in _history:
-        orig_short = entry["original"][:40].replace("\n", " ")
-        if len(entry["original"]) > 40:
-            orig_short += "…"
-        label = f"[{entry['mode']}] {entry['ts']} — {orig_short}"
-        act = _history_menu.addAction(label)
-        act.setToolTip(entry["corrected"][:200])
+    for entry in _history.entries:
+        act = _history_menu.addAction(format_menu_label(entry))
+        act.setToolTip(format_tooltip(entry))
         corrected = entry["corrected"]
         act.triggered.connect(
             lambda checked=False, c=corrected: QApplication.clipboard().setText(c)
@@ -105,10 +103,8 @@ class TextPolishPanel(QObject):
         super().__init__()
         self._selected_text = ""
         self._app_ref = None
-        self._status_job = 0
         self._current_mode = "pro"
-        self._stream_job = 0
-        self._streaming_started = False
+        self._job_runner = PolishJobRunner(on_main=_on_main)
         self._create_panel()
 
     # ----------------------------------------------------------------- setup
@@ -200,67 +196,28 @@ class TextPolishPanel(QObject):
             return
         self._current_mode = mode
         self._set_enabled(False)
-        self._status_job += 1
-        job_id = self._status_job
-        self._stream_job = job_id
-        self._streaming_started = False
-        self._set_status("Preparing correction.")
+        self._job_runner.start(
+            self._selected_text, mode, custom_prompt,
+            status_steps=_STATUS_STEPS,
+            polish_fn=polish_text,
+            on_status=self._set_status,
+            on_stream_start=self._on_stream_start,
+            on_token=self._text_view.insertPlainText,
+            on_success=self._on_success,
+            on_error=self._on_error,
+        )
 
-        def status_worker():
-            steps = [
-                (1.0,    "Preparing correction"),
-                (3.0,    "Calling Gemini"),
-                (6.0,    "Rewriting text"),
-                (9999.0, "Finalising response"),
-            ]
-            start = time.monotonic()
-            last_message = None
-
-            while job_id == self._status_job:
-                elapsed = time.monotonic() - start
-                for threshold, label in steps:
-                    if elapsed < threshold:
-                        break
-
-                dots = "." * ((int(elapsed * 3) % 3) + 1)
-                message = f"{label}{dots}"
-                if message != last_message:
-                    _on_main(lambda msg=message, jid=job_id: self._update_status_if_current(jid, msg))
-                    last_message = message
-                time.sleep(0.35)
-
-        def on_token(token: str):
-            _on_main(lambda t=token, jid=job_id: self._update_streaming(t, jid))
-
-        def worker():
-            try:
-                result = polish_text(self._selected_text, mode, custom_prompt, on_token=on_token)
-                _on_main(lambda: self._on_success(result))
-            except Exception as exc:
-                _on_main(lambda e=exc: self._on_error(str(e)))
-
-        threading.Thread(target=status_worker, daemon=True).start()
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _update_streaming(self, token: str, job_id: int):
-        if job_id != self._stream_job:
-            return
-        if not self._streaming_started:
-            self._streaming_started = True
-            self._status_job += 1
-            self._status.setText("")
-            self._text_view.setStyleSheet("")
-            self._text_view.setText("")
-        self._text_view.insertPlainText(token)
+    def _on_stream_start(self):
+        self._status.setText("")
+        self._text_view.setStyleSheet("")
+        self._text_view.setText("")
 
     def _on_success(self, result: str):
-        self._status_job += 1
         self._hide()
         paste_text(result, self._app_ref)
         _add_to_history(self._selected_text, result, self._current_mode)
 
     def _on_error(self, message: str):
-        self._status_job += 1
         short = message[:60] + ("…" if len(message) > 60 else "")
         self._status.setText(f"Error: {short}")
         self._status.setStyleSheet("color: red;")
@@ -269,10 +226,6 @@ class TextPolishPanel(QObject):
     def _set_status(self, message: str):
         self._status.setText(message)
         self._status.setStyleSheet("color: gray;")
-
-    def _update_status_if_current(self, job_id: int, message: str):
-        if job_id == self._status_job:
-            self._set_status(message)
 
     def _open_custom_dialog(self):
         dlg = QDialog(self._panel)

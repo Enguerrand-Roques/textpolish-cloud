@@ -1,21 +1,18 @@
 """
-TextPolish panel — native NSPanel via PyObjC.
-Replaces CustomTkinter to appear correctly above fullscreen apps.
+TextPolish panel — WKWebView inside NSPanel.
+The panel.html file provides the full Pip-design UI; Python communicates
+with it via a WKScriptMessageHandler bridge (JS→Python) and
+evaluateJavaScript (Python→JS).
 """
 
-import datetime
+import json
+import os
 import threading
-import time
 import objc
-from Foundation import NSObject
+from Foundation import NSObject, NSURL
+
 from AppKit import (
     NSPanel,
-    NSButton,
-    NSTextField,
-    NSScrollView,
-    NSTextView,
-    NSColor,
-    NSFont,
     NSMakeRect,
     NSBackingStoreBuffered,
     NSWindowStyleMaskTitled,
@@ -32,10 +29,25 @@ from AppKit import (
     NSMenuItem,
     NSImage,
     NSPasteboard,
+    NSViewWidthSizable,
+    NSViewHeightSizable,
+    NSAlert,
+    NSAlertFirstButtonReturn,
+    NSWorkspace,
+    NSScreen,
+    NSMakePoint,
 )
+
+from WebKit import WKWebView, WKWebViewConfiguration, WKUserContentController
 
 from clipboard import get_app_and_copy, paste_text
 from llm import polish_text
+from history import CorrectionHistory, format_menu_label, format_tooltip
+from polish_job import PolishJobRunner
+from diff import compute_word_diff
+from platforms.macos.ax_bounds import get_selection_bounds
+
+_HTML_PATH = os.path.join(os.path.dirname(__file__), "panel.html")
 
 _PANEL_STYLE = (
     NSWindowStyleMaskTitled
@@ -49,13 +61,15 @@ _COLLECTION = (
     | NSWindowCollectionBehaviorFullScreenAuxiliary
 )
 
+_COMPACT_SIZE = (380, 258)
+_EXPANDED_SIZE = (420, 520)
+
+
 # ---------------------------------------------------------------------------
-# Thread bridge — schedules Python callables on the AppKit main thread
+# Thread bridge — routes Python callables to the AppKit main thread
 # ---------------------------------------------------------------------------
 
 class _MainThreadBridge(NSObject):
-    """Routes Python callables to the AppKit main run loop."""
-
     def init(self):
         self = objc.super(_MainThreadBridge, self).init()
         if self is None:
@@ -82,22 +96,44 @@ class _MainThreadBridge(NSObject):
 _bridge: _MainThreadBridge | None = None
 
 
-def _on_main(fn):
-    assert _bridge is not None, "call ui.setup() first"
-    _bridge.schedule(fn)
+# ---------------------------------------------------------------------------
+# JS → Python message handler
+# ---------------------------------------------------------------------------
+
+class _BridgeHandler(NSObject):
+    """Receives postMessage calls from the WKWebView JS."""
+
+    def init(self):
+        self = objc.super(_BridgeHandler, self).init()
+        if self is None:
+            return None
+        self._panel_ref = None
+        return self
+
+    def userContentController_didReceiveScriptMessage_(self, controller, message):
+        body = message.body()
+        panel = self._panel_ref
+        if panel is None:
+            return
+        _on_main(lambda b=body: panel._handle_js_message(b))
 
 
 # ---------------------------------------------------------------------------
-# History — last 10 corrections (in-memory)
+# History
 # ---------------------------------------------------------------------------
 
-_history: list[dict] = []
+_history = CorrectionHistory()
 _history_menu: NSMenu | None = None
+
+_STATUS_STEPS = [
+    (1.0,    "Préparation"),
+    (3.0,    "Appel à Gemini"),
+    (6.0,    "Réécriture en cours"),
+    (9999.0, "Finalisation"),
+]
 
 
 class _HistoryHandler(NSObject):
-    """Handles clicks on history menu items — copies corrected text to clipboard."""
-
     def copyText_(self, sender):
         corrected = sender.representedObject()
         if corrected:
@@ -110,10 +146,7 @@ _history_handler: _HistoryHandler | None = None
 
 
 def _add_to_history(original: str, corrected: str, mode: str) -> None:
-    global _history
-    ts = datetime.datetime.now().strftime("%H:%M")
-    _history.insert(0, {"original": original, "corrected": corrected, "mode": mode, "ts": ts})
-    _history = _history[:10]
+    _history.add(original, corrected, mode)
     _update_history_menu()
 
 
@@ -121,23 +154,46 @@ def _update_history_menu() -> None:
     if _history_menu is None:
         return
     _history_menu.removeAllItems()
-    if not _history:
+    if not _history.entries:
         empty = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("No corrections yet", None, "")
         empty.setEnabled_(False)
         _history_menu.addItem_(empty)
         return
-    for entry in _history:
-        orig_short = entry["original"][:40].replace("\n", " ")
-        if len(entry["original"]) > 40:
-            orig_short += "…"
-        label = f"[{entry['mode']}] {entry['ts']} — {orig_short}"
+    for entry in _history.entries:
         item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-            label, "copyText:", ""
+            format_menu_label(entry), "copyText:", ""
         )
         item.setTarget_(_history_handler)
         item.setRepresentedObject_(entry["corrected"])
-        item.setToolTip_(f"Click to copy corrected text\n\n{entry['corrected'][:200]}")
+        item.setToolTip_(f"Click to copy corrected text\n\n{format_tooltip(entry)}")
         _history_menu.addItem_(item)
+
+
+def _on_main(fn):
+    assert _bridge is not None, "call ui.setup() first"
+    _bridge.schedule(fn)
+
+
+def show_accessibility_denied_alert() -> None:
+    """Show a native alert when the Accessibility permission is missing,
+    with a button that deep-links into System Settings. Safe to call from
+    any thread — dispatches to the main thread internally."""
+    def _show():
+        alert = NSAlert.alloc().init()
+        alert.setMessageText_("Accessibility permission required")
+        alert.setInformativeText_(
+            "TextPolish Cloud needs Accessibility access to listen for the "
+            "global keyboard shortcut. Grant it in System Settings → Privacy "
+            "& Security → Accessibility, then restart TextPolish Cloud."
+        )
+        alert.addButtonWithTitle_("Open System Settings")
+        alert.addButtonWithTitle_("Cancel")
+        if alert.runModal() == NSAlertFirstButtonReturn:
+            url = NSURL.URLWithString_(
+                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+            )
+            NSWorkspace.sharedWorkspace().openURL_(url)
+    _on_main(_show)
 
 
 # ---------------------------------------------------------------------------
@@ -152,21 +208,21 @@ class TextPolishPanel(NSObject):
             return None
         self._selected_text = ""
         self._app_ref = None
-        self._custom_dialog = None
-        self._custom_input = None
-        self._status_job = 0
         self._current_mode = "pro"
-        self._stream_job = 0
-        self._streaming_started = False
+        self._pending_result = None
+        self._job_runner = PolishJobRunner(on_main=_on_main)
+        self._webview_ready = False
+        self._pending_js: list[str] = []
         self._create_panel()
         return self
 
-    # ----------------------------------------------------------------- setup
+    # ── Setup ────────────────────────────────────────────────────────────────
 
     @objc.python_method
     def _create_panel(self):
+        w, h = _COMPACT_SIZE
         self._panel = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
-            NSMakeRect(0, 0, 440, 330),
+            NSMakeRect(0, 0, w, h),
             _PANEL_STYLE,
             NSBackingStoreBuffered,
             False,
@@ -175,298 +231,205 @@ class TextPolishPanel(NSObject):
         self._panel.setLevel_(NSFloatingWindowLevel)
         self._panel.setHidesOnDeactivate_(False)
         self._panel.setCollectionBehavior_(_COLLECTION)
-        self._panel.setDelegate_(self)   # for windowShouldClose_
-        self._build_views()
+        self._panel.setDelegate_(self)
+        self._build_webview()
 
     @objc.python_method
-    def _build_views(self):
+    def _build_webview(self):
+        config = WKWebViewConfiguration.alloc().init()
+        controller = WKUserContentController.alloc().init()
+
+        self._bridge_handler = _BridgeHandler.alloc().init()
+        self._bridge_handler._panel_ref = self
+        controller.addScriptMessageHandler_name_(self._bridge_handler, "bridge")
+        config.setUserContentController_(controller)
+
         cv = self._panel.contentView()
-        W, H, pad = 440, 330, 16
+        frame = cv.bounds()
+        self._webview = WKWebView.alloc().initWithFrame_configuration_(frame, config)
+        self._webview.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable)
+        self._webview.setNavigationDelegate_(self)
 
-        # Title
-        lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(pad, H - 44, W - 2 * pad, 28))
-        lbl.setStringValue_("TextPolish")
-        lbl.setEditable_(False)
-        lbl.setBordered_(False)
-        lbl.setDrawsBackground_(False)
-        lbl.setFont_(NSFont.boldSystemFontOfSize_(17))
-        lbl.setTextColor_(NSColor.labelColor())
-        cv.addSubview_(lbl)
+        html_url  = NSURL.fileURLWithPath_(_HTML_PATH)
+        base_url  = NSURL.fileURLWithPath_(os.path.dirname(_HTML_PATH))
+        self._webview.loadFileURL_allowingReadAccessToURL_(html_url, base_url)
 
-        # Buttons row (bottom)
-        btn_h, gap = 34, 8
-        btn_w = (W - 2 * pad - 2 * gap) / 3
-        btn_y = pad
+        cv.addSubview_(self._webview)
 
-        self._btn_pro = self._make_btn_("Professional", NSMakeRect(pad, btn_y, btn_w, btn_h))
-        self._btn_pro.setTarget_(self)
-        self._btn_pro.setAction_("onPro:")
-        cv.addSubview_(self._btn_pro)
+    # ── WKNavigationDelegate ─────────────────────────────────────────────────
 
-        self._btn_casual = self._make_btn_("Casual", NSMakeRect(pad + btn_w + gap, btn_y, btn_w, btn_h))
-        self._btn_casual.setTarget_(self)
-        self._btn_casual.setAction_("onCasual:")
-        cv.addSubview_(self._btn_casual)
+    def webView_didFinishNavigation_(self, webview, navigation):
+        self._webview_ready = True
+        for code in self._pending_js:
+            self._webview.evaluateJavaScript_completionHandler_(code, None)
+        self._pending_js = []
 
-        self._btn_custom = self._make_btn_("Custom", NSMakeRect(pad + 2 * (btn_w + gap), btn_y, btn_w, btn_h))
-        self._btn_custom.setTarget_(self)
-        self._btn_custom.setAction_("onCustom:")
-        cv.addSubview_(self._btn_custom)
-
-        # Status label (just above buttons)
-        status_y = btn_y + btn_h + 4
-        self._status = NSTextField.alloc().initWithFrame_(NSMakeRect(pad, status_y, W - 2 * pad, 18))
-        self._status.setStringValue_("")
-        self._status.setEditable_(False)
-        self._status.setBordered_(False)
-        self._status.setDrawsBackground_(False)
-        self._status.setFont_(NSFont.systemFontOfSize_(11))
-        self._status.setTextColor_(NSColor.secondaryLabelColor())
-        cv.addSubview_(self._status)
-
-        # Preview text (scrollable, between title and status)
-        preview_y = status_y + 18 + 6
-        preview_h = H - 44 - pad - preview_y - 6
-
-        scroll = NSScrollView.alloc().initWithFrame_(
-            NSMakeRect(pad, preview_y, W - 2 * pad, preview_h)
-        )
-        scroll.setHasVerticalScroller_(True)
-        scroll.setAutohidesScrollers_(True)
-        scroll.setBorderType_(2)  # NSBezelBorder
-
-        self._text_view = NSTextView.alloc().initWithFrame_(
-            NSMakeRect(0, 0, W - 2 * pad, preview_h)
-        )
-        self._text_view.setEditable_(False)
-        self._text_view.setRichText_(False)
-        self._text_view.setFont_(NSFont.systemFontOfSize_(12))
-        self._text_view.setTextColor_(NSColor.secondaryLabelColor())
-        scroll.setDocumentView_(self._text_view)
-        cv.addSubview_(scroll)
-
-        # Hidden button — catches Escape to close the panel
-        esc_btn = NSButton.alloc().initWithFrame_(NSMakeRect(0, 0, 0, 0))
-        esc_btn.setKeyEquivalent_("\x1b")
-        esc_btn.setTarget_(self)
-        esc_btn.setAction_("onClose:")
-        cv.addSubview_(esc_btn)
+    # ── JS helper ────────────────────────────────────────────────────────────
 
     @objc.python_method
-    def _make_btn_(self, title, frame):
-        btn = NSButton.alloc().initWithFrame_(frame)
-        btn.setTitle_(title)
-        btn.setBezelStyle_(1)  # NSBezelStyleRounded
-        return btn
+    def _js(self, code: str):
+        if self._webview_ready:
+            self._webview.evaluateJavaScript_completionHandler_(code, None)
+        else:
+            self._pending_js.append(code)
 
-    # ---------------------------------------------------------------- ObjC actions (called by Cocoa)
+    # ── JS → Python message handler ──────────────────────────────────────────
 
-    def onPro_(self, sender):
-        self._start_process("pro")
+    @objc.python_method
+    def _handle_js_message(self, body: dict):
+        msg_type = body.get("type")
+        if msg_type == "polish":
+            mode = body.get("mode", "pro")
+            instruction = body.get("instruction") or None
+            self._current_mode = mode
+            self._start_process(mode, custom_prompt=instruction)
+        elif msg_type == "close":
+            self._hide()
+        elif msg_type == "accept":
+            if self._pending_result is not None:
+                self._do_paste(self._pending_result)
+        elif msg_type == "expand":
+            self._set_expanded(bool(body.get("value")))
 
-    def onCasual_(self, sender):
-        self._start_process("casual")
-
-    def onCustom_(self, sender):
-        self._open_custom_dialog()
-
-    def onClose_(self, sender):
-        self._hide()
+    # ── Cocoa delegate ───────────────────────────────────────────────────────
 
     def windowShouldClose_(self, sender):
-        """Called by the red close button — hides the panel without destroying it."""
         self._hide()
         return False
 
-    def applyCustom_(self, sender):
-        prompt = self._custom_input.string().strip()
-        self._custom_dialog.orderOut_(None)
-        self._custom_dialog = None
-        self._custom_input = None
-        if prompt:
-            self._start_process("custom", custom_prompt=prompt)
-
-    # ---------------------------------------------------------------- public API
+    # ── Public API ───────────────────────────────────────────────────────────
 
     @objc.python_method
     def trigger_polish(self):
-        """Called from pynput background thread on shortcut."""
+        """Called from hotkey background thread on shortcut press."""
         self._app_ref, self._selected_text = get_app_and_copy()
         _on_main(self._show)
 
-    # ---------------------------------------------------------------- internal UI
+    # ── Internal UI ──────────────────────────────────────────────────────────
 
     @objc.python_method
     def _show(self):
-        if self._selected_text.strip():
-            self._text_view.setString_(self._selected_text)
-            self._text_view.setTextColor_(NSColor.secondaryLabelColor())
-            self._set_enabled(True)
+        self._set_expanded(False, animate=False)
+        self._js("App.reset()")
+        app_name = None
+        if self._app_ref is not None:
+            try:
+                app_name = self._app_ref.localizedName()
+            except Exception:
+                pass
+        self._js(f"App.setSourceApp({json.dumps(app_name)})")
+        has_text = bool(self._selected_text.strip())
+        if has_text:
+            self._current_mode = "casual"
+            self._js(f"App.setInputText({json.dumps(self._selected_text)})")
+            self._js(f"App.setMode({json.dumps(self._current_mode)})")
         else:
-            self._text_view.setString_("No text selected — select text first")
-            self._text_view.setTextColor_(NSColor.tertiaryLabelColor())
-            self._set_enabled(False)
-
-        self._status.setStringValue_("")
-        self._status.setTextColor_(NSColor.secondaryLabelColor())
-
-        self._panel.center()
+            self._js("App.setInputText('Aucun texte sélectionné — sélectionnez du texte d\\'abord')")
+        self._position_near_selection()
         self._panel.makeKeyAndOrderFront_(None)
+        if has_text:
+            self._start_process(self._current_mode)
+
+    @objc.python_method
+    def _position_near_selection(self):
+        """Anchor the panel just below the current text selection using the
+        Accessibility API. Falls back to centering the panel on screen if
+        the selection bounds are unavailable (no selection, app doesn't
+        expose it, or the AX call fails) — see platforms/macos/ax_bounds.py.
+        """
+        bounds = get_selection_bounds()
+        screen = NSScreen.mainScreen()
+        if bounds is None or screen is None:
+            self._panel.center()
+            return
+
+        x, y, w, h = bounds
+        screen_frame = screen.frame()
+        panel_w, panel_h = _COMPACT_SIZE
+        gap = 8
+
+        # AX bounds use a top-left, Y-down origin; Cocoa screen coordinates
+        # use a bottom-left, Y-up origin.
+        origin_x = x
+        origin_y = screen_frame.size.height - (y + h) - panel_h - gap
+        if origin_y < 0:
+            # Not enough room below the selection — place it above instead.
+            origin_y = screen_frame.size.height - y + gap
+
+        origin_x = max(0, min(origin_x, screen_frame.size.width - panel_w))
+        origin_y = max(0, min(origin_y, screen_frame.size.height - panel_h))
+        self._panel.setFrameOrigin_(NSMakePoint(origin_x, origin_y))
+
+    @objc.python_method
+    def _set_expanded(self, expand: bool, animate: bool = True):
+        """Resize the native panel between the compact and expanded sizes,
+        keeping the top edge fixed (the panel grows/shrinks downward, which
+        matches it being anchored below the text selection)."""
+        w, h = _EXPANDED_SIZE if expand else _COMPACT_SIZE
+        frame = self._panel.frame()
+        screen = NSScreen.mainScreen()
+        top = frame.origin.y + frame.size.height
+        new_origin_y = top - h
+        new_origin_x = frame.origin.x
+        if screen is not None:
+            screen_frame = screen.frame()
+            new_origin_x = max(0, min(new_origin_x, screen_frame.size.width - w))
+            new_origin_y = max(0, min(new_origin_y, screen_frame.size.height - h))
+        new_frame = NSMakeRect(new_origin_x, new_origin_y, w, h)
+        self._panel.setFrame_display_animate_(new_frame, True, animate)
 
     @objc.python_method
     def _hide(self):
         self._panel.orderOut_(None)
 
     @objc.python_method
-    def _set_enabled(self, enabled: bool):
-        self._btn_pro.setEnabled_(enabled)
-        self._btn_casual.setEnabled_(enabled)
-        self._btn_custom.setEnabled_(enabled)
-
-    @objc.python_method
     def _start_process(self, mode: str, custom_prompt: str | None = None):
         if not self._selected_text.strip():
             return
-        self._current_mode = mode
-        self._set_enabled(False)
-        self._status_job += 1
-        job_id = self._status_job
-        self._stream_job = job_id
-        self._streaming_started = False
-        self._set_status("Preparing correction.")
-
-        def status_worker():
-            steps = [
-                (1.0,   "Preparing correction"),
-                (3.0,   "Calling Gemini"),
-                (6.0,   "Rewriting text"),
-                (9999.0, "Finalising response"),
-            ]
-            start = time.monotonic()
-            last_message = None
-
-            while job_id == self._status_job:
-                elapsed = time.monotonic() - start
-                for threshold, label in steps:
-                    if elapsed < threshold:
-                        break
-
-                dots = "." * ((int(elapsed * 3) % 3) + 1)
-                message = f"{label}{dots}"
-                if message != last_message:
-                    _on_main(lambda msg=message, jid=job_id: self._update_status_if_current(jid, msg))
-                    last_message = message
-                time.sleep(0.35)
-
-        def on_token(token: str):
-            _on_main(lambda t=token, jid=job_id: self._update_streaming(t, jid))
-
-        def worker():
-            try:
-                result = polish_text(self._selected_text, mode, custom_prompt, on_token=on_token)
-                _on_main(lambda: self._on_success(result))
-            except Exception as exc:
-                _on_main(lambda e=exc: self._on_error(str(e)))
-
-        threading.Thread(target=status_worker, daemon=True).start()
-        threading.Thread(target=worker, daemon=True).start()
-
-    @objc.python_method
-    def _update_streaming(self, token: str, job_id: int):
-        if job_id != self._stream_job:
-            return
-        if not self._streaming_started:
-            self._streaming_started = True
-            self._status_job += 1
-            self._status.setStringValue_("")
-            self._text_view.setTextColor_(NSColor.labelColor())
-            self._text_view.setString_("")
-        current = str(self._text_view.string())
-        self._text_view.setString_(current + token)
+        self._js("App.onPolishStart()")
+        self._job_runner.start(
+            self._selected_text, mode, custom_prompt,
+            status_steps=_STATUS_STEPS,
+            polish_fn=polish_text,
+            on_status=lambda m: self._js(f"App.setStatus({json.dumps(m)})"),
+            on_stream_start=lambda: self._js("App.startStream()"),
+            on_token=lambda t: self._js(f"App.appendToken({json.dumps(t)})"),
+            on_success=self._on_success,
+            on_error=self._on_error,
+        )
 
     @objc.python_method
     def _on_success(self, result: str):
-        self._status_job += 1
+        self._pending_result = result
+        self._js("App.onDone()")
+        segments = compute_word_diff(self._selected_text, result)
+        self._js(f"App.setDiff({json.dumps(segments)})")
+
+    @objc.python_method
+    def _do_paste(self, result: str):
+        self._pending_result = None
         self._hide()
         paste_text(result, self._app_ref)
         _add_to_history(self._selected_text, result, self._current_mode)
+        self._update_history_webview()
+
+    @objc.python_method
+    def _update_history_webview(self):
+        items = [
+            {
+                "mode":      e["mode"],
+                "ts":        e["ts"],
+                "preview":   e["original"][:60] + ("…" if len(e["original"]) > 60 else ""),
+                "corrected": e["corrected"],
+            }
+            for e in _history.entries
+        ]
+        self._js(f"App.updateHistory({json.dumps(items)})")
 
     @objc.python_method
     def _on_error(self, message: str):
-        self._status_job += 1
-        short = message[:60] + ("…" if len(message) > 60 else "")
-        self._status.setStringValue_(f"Error: {short}")
-        self._status.setTextColor_(NSColor.systemRedColor())
-        self._set_enabled(True)
-
-    @objc.python_method
-    def _set_status(self, message: str):
-        self._status.setStringValue_(message)
-        self._status.setTextColor_(NSColor.secondaryLabelColor())
-
-    @objc.python_method
-    def _update_status_if_current(self, job_id: int, message: str):
-        if job_id == self._status_job:
-            self._set_status(message)
-
-    @objc.python_method
-    def _open_custom_dialog(self):
-        if self._custom_dialog is not None:
-            self._custom_dialog.makeKeyAndOrderFront_(None)
-            return
-
-        style = (
-            NSWindowStyleMaskTitled
-            | NSWindowStyleMaskClosable
-            | NSWindowStyleMaskUtilityWindow
-            | NSWindowStyleMaskNonactivatingPanel
-        )
-        dlg = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
-            NSMakeRect(0, 0, 400, 200),
-            style,
-            NSBackingStoreBuffered,
-            False,
-        )
-        dlg.setTitle_("Custom instruction")
-        dlg.setLevel_(NSFloatingWindowLevel)
-        dlg.setCollectionBehavior_(_COLLECTION)
-
-        cv = dlg.contentView()
-        W, H, pad = 400, 200, 16
-
-        lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(pad, H - 38, W - 2 * pad, 22))
-        lbl.setStringValue_("Describe how to rewrite the text:")
-        lbl.setEditable_(False)
-        lbl.setBordered_(False)
-        lbl.setDrawsBackground_(False)
-        lbl.setFont_(NSFont.systemFontOfSize_(12))
-        lbl.setTextColor_(NSColor.secondaryLabelColor())
-        cv.addSubview_(lbl)
-
-        apply_btn = NSButton.alloc().initWithFrame_(NSMakeRect((W - 110) / 2, pad, 110, 34))
-        apply_btn.setTitle_("Apply")
-        apply_btn.setBezelStyle_(1)
-        apply_btn.setTarget_(self)
-        apply_btn.setAction_("applyCustom:")
-        cv.addSubview_(apply_btn)
-
-        scroll = NSScrollView.alloc().initWithFrame_(
-            NSMakeRect(pad, pad + 34 + 8, W - 2 * pad, H - 38 - pad - 34 - 8 - 8)
-        )
-        scroll.setHasVerticalScroller_(True)
-        scroll.setBorderType_(2)
-
-        text_input = NSTextView.alloc().initWithFrame_(NSMakeRect(0, 0, W - 2 * pad, 80))
-        text_input.setString_("Rewrite this text keeping my style, make it punchier.")
-        text_input.setFont_(NSFont.systemFontOfSize_(12))
-        scroll.setDocumentView_(text_input)
-        cv.addSubview_(scroll)
-
-        self._custom_dialog = dlg
-        self._custom_input = text_input
-
-        dlg.center()
-        dlg.makeKeyAndOrderFront_(None)
+        short = message[:80] + ("…" if len(message) > 80 else "")
+        self._js(f"App.onError({json.dumps(short)})")
 
 
 # ---------------------------------------------------------------------------
@@ -474,7 +437,6 @@ class TextPolishPanel(NSObject):
 # ---------------------------------------------------------------------------
 
 def setup() -> TextPolishPanel:
-    """Initialize bridge and panel. Must be called from the main thread."""
     global _bridge, _status_item, _history_handler
     _bridge = _MainThreadBridge.alloc().init()
     _history_handler = _HistoryHandler.alloc().init()
@@ -483,7 +445,7 @@ def setup() -> TextPolishPanel:
 
 
 def _create_status_item():
-    bar = NSStatusBar.systemStatusBar()
+    bar  = NSStatusBar.systemStatusBar()
     item = bar.statusItemWithLength_(NSVariableStatusItemLength)
 
     img = NSImage.imageWithSystemSymbolName_accessibilityDescription_("pencil", "TextPolish Cloud")
@@ -496,7 +458,6 @@ def _create_status_item():
 
     menu = NSMenu.alloc().init()
 
-    # History submenu
     history_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("History", None, "")
     submenu = NSMenu.alloc().initWithTitle_("History")
     empty = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("No corrections yet", None, "")

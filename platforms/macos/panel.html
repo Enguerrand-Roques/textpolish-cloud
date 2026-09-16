@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --pro:    #5b8db8;
+    --casual: #6a9e7f;
+    --custom: #8b8fc7;
+    --accent: var(--pro);
+    --font:   -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    --mono:   'SF Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #f6f7f9; }
+  body {
+    font-family: var(--font);
+    color: #1a2330;
+    display: flex; flex-direction: column;
+    padding: 14px; gap: 10px;
+    -webkit-font-smoothing: antialiased;
+    -webkit-user-select: none; user-select: none;
+  }
+  body[data-mode="pro"]    { --accent: var(--pro); }
+  body[data-mode="casual"] { --accent: var(--casual); }
+  body[data-mode="custom"] { --accent: var(--custom); }
+
+  /* Pip mascot */
+  .pip-wrap { width: 48px; height: 48px; flex-shrink: 0; }
+  .pip-wrap svg { image-rendering: pixelated; width: 48px; height: 48px; }
+  .pip-wrap[data-mode="pro"]    { --pb:#5b8db8;--pb2:#3e6b91;--pb3:#7aa7cf;--pb4:#8ab6d8;--pb5:#3a5f7f; }
+  .pip-wrap[data-mode="casual"] { --pb:#6a9e7f;--pb2:#4d7a5e;--pb3:#8cbb9e;--pb4:#9dc7ae;--pb5:#3f6a51; }
+  .pip-wrap[data-mode="custom"] { --pb:#8b8fc7;--pb2:#696ea6;--pb3:#aaadd8;--pb4:#b9bce0;--pb5:#545890; }
+
+  /* Compact vs expanded view */
+  .expand-only { display: block; }
+  body[data-expanded="false"] .expand-only { display: none !important; }
+  .expand-toggle {
+    width: 22px; height: 22px; border-radius: 6px; border: 1px solid #dde1e7;
+    background: #fff; color: #5a6a7e; font-size: 11px; cursor: pointer;
+    display: grid; place-items: center; flex-shrink: 0;
+    transition: transform 0.15s, background 0.1s;
+  }
+  .expand-toggle:hover { background: #eceff3; }
+  body[data-expanded="true"] .expand-toggle { transform: rotate(180deg); }
+
+  /* Row: Pip + mode name */
+  .mascot-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .mode-block { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .mode-name  { font-size: 13px; font-weight: 600; color: #1a2330; display: flex; align-items: center; gap: 7px; }
+  .accent-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .kbd {
+    font-family: var(--mono); font-size: 10px; color: #3a475a;
+    background: #eceff3; border: 1px solid #dde1e7;
+    padding: 2px 6px; border-radius: 4px; letter-spacing: 0.03em;
+  }
+
+  /* Section labels */
+  .lbl {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #6f7a8a; display: flex; align-items: center; justify-content: space-between;
+  }
+  .lbl .hint { color: color-mix(in oklab, var(--accent) 70%, #6f7a8a); }
+
+  /* Text boxes */
+  .box {
+    background: #fff; border: 1px solid #e3e6eb; border-radius: 7px;
+    padding: 9px 10px; font-size: 12px; line-height: 1.45; color: #3a475a;
+    min-height: 62px; white-space: pre-wrap; word-break: break-word;
+    overflow-y: auto; max-height: 100px;
+    -webkit-user-select: text; user-select: text;
+  }
+  .box.out {
+    background: color-mix(in oklab, var(--accent) 8%, #fff);
+    border-color: color-mix(in oklab, var(--accent) 28%, #e3e6eb);
+    color: #1a2330;
+  }
+  .status { font-family: var(--mono); font-size: 10px; color: #9da8b5; }
+  .diff-del {
+    text-decoration: line-through; color: #b94040;
+    background: color-mix(in oklab, #b94040 10%, transparent);
+    border-radius: 2px;
+  }
+  .diff-ins {
+    text-decoration: none; color: #1a2330; font-weight: 600;
+    background: color-mix(in oklab, var(--accent) 22%, transparent);
+    border-radius: 2px;
+  }
+  .cursor {
+    display: inline-block; width: 6px; height: 12px;
+    background: var(--accent); vertical-align: -2px; margin-left: 1px;
+    animation: blink 1.05s steps(1) infinite; border-radius: 1px;
+  }
+  @keyframes blink { 0%,50%{opacity:1} 50.01%,100%{opacity:0} }
+  .cursor.hidden { display: none; }
+
+  /* Instruction row (custom mode) */
+  .instr-row { display: none; flex-direction: column; gap: 8px; }
+  .instr-row.show { display: flex; }
+  .instr {
+    display: flex; align-items: center; gap: 7px;
+    background: #fff; border: 1px solid #e3e6eb; border-radius: 7px;
+    padding: 7px 9px;
+  }
+  .i-icon {
+    width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+    background: color-mix(in oklab, var(--accent) 14%, #fff);
+    border: 1px solid color-mix(in oklab, var(--accent) 35%, #e3e6eb);
+    color: color-mix(in oklab, var(--accent) 60%, #1a2330);
+    font-size: 9px; display: grid; place-items: center;
+    font-family: var(--mono); font-weight: 600;
+  }
+  .instr input {
+    flex: 1; background: none; border: none; outline: none;
+    font-family: var(--mono); font-size: 11px; color: #3a475a;
+    -webkit-user-select: text; user-select: text;
+  }
+  .instr input::placeholder { color: #9da8b5; }
+
+  /* Mode chips */
+  .chips {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
+    background: #eceff3; padding: 4px; border-radius: 7px;
+    border: 1px solid #dde1e7;
+  }
+  .chip {
+    font-size: 11px; font-weight: 500; color: #5a6a7e;
+    background: transparent; border: none;
+    padding: 6px 0; border-radius: 5px; text-align: center; cursor: pointer;
+    font-family: var(--font); transition: all 0.12s;
+  }
+  .chip.active {
+    background: color-mix(in oklab, var(--accent) 22%, #fff);
+    color: #1a2330;
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 50%, transparent);
+  }
+
+  /* Repolir button */
+  .btn {
+    width: 100%; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid color-mix(in oklab, var(--accent) 50%, rgba(255,255,255,0.06));
+    background: linear-gradient(180deg,
+      color-mix(in oklab, var(--accent) 78%, #0c1a2b) 0%,
+      color-mix(in oklab, var(--accent) 62%, #0c1a2b) 100%);
+    color: #fff; font-size: 12.5px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    cursor: pointer; font-family: var(--font);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset,
+      0 7px 16px -8px color-mix(in oklab, var(--accent) 70%, transparent);
+    transition: opacity 0.12s;
+  }
+  .btn:hover  { opacity: 0.88; }
+  .btn:active { opacity: 0.78; }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn .sub { margin-left: auto; font-family: var(--mono); font-size: 10px; opacity: 0.65; }
+
+  /* Accept / Revise row (shown once a result is ready) */
+  .review-row { display: none; gap: 6px; }
+  .review-row.show { display: flex; }
+  .btn-accept, .btn-revise {
+    flex: 1; padding: 9px 10px; border-radius: 8px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    font-family: var(--font); transition: opacity 0.12s;
+  }
+  .btn-accept {
+    border: 1px solid color-mix(in oklab, var(--accent) 50%, rgba(255,255,255,0.06));
+    background: linear-gradient(180deg,
+      color-mix(in oklab, var(--accent) 78%, #0c1a2b) 0%,
+      color-mix(in oklab, var(--accent) 62%, #0c1a2b) 100%);
+    color: #fff;
+  }
+  .btn-revise {
+    border: 1px solid #dde1e7; background: #fff; color: #3a475a;
+  }
+  .btn-accept:hover, .btn-revise:hover { opacity: 0.85; }
+  .btn-accept:active, .btn-revise:active { opacity: 0.7; }
+
+  /* History bar */
+  .hist {
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--mono); font-size: 9.5px; color: #8a96a6;
+  }
+  .hist-left { display: flex; align-items: center; gap: 7px; }
+  .pill {
+    background: #eceff3; border: 1px solid #dde1e7; border-radius: 999px;
+    padding: 2px 7px; color: #3a475a; font-size: 9px; cursor: pointer;
+    transition: background 0.1s;
+  }
+  .pill:hover { background: #e3e6eb; }
+  .dots { display: flex; gap: 3px; }
+  .dots i { width: 4px; height: 4px; border-radius: 50%; background: #dde1e7; display: inline-block; }
+  .dots i.filled  { background: color-mix(in oklab, var(--accent) 60%, #c9cdd4); }
+  .dots i.current { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+
+  /* History drawer */
+  .hist-drawer {
+    margin-top: -4px; background: #eff1f4;
+    border-top: 1px solid #dde1e7; border-radius: 0 0 7px 7px;
+    max-height: 0; overflow: hidden; transition: max-height 0.2s ease;
+  }
+  .hist-drawer.open { max-height: 160px; overflow-y: auto; }
+  .hist-item {
+    padding: 7px 12px; font-size: 11px; color: #3a475a; cursor: pointer;
+    border-bottom: 1px solid #e3e6eb;
+    display: flex; gap: 8px; align-items: baseline;
+  }
+  .hist-item:last-child { border-bottom: none; }
+  .hist-item:hover { background: #e5e8ec; border-left: 2px solid var(--accent); padding-left: 10px; }
+  .copy-btn {
+    display: none; align-self: flex-end;
+    font-family: var(--mono); font-size: 10px; color: #8a96a6;
+    background: none; border: 1px solid #e3e6eb; border-radius: 5px;
+    padding: 3px 8px; cursor: pointer; transition: all 0.15s;
+  }
+  .copy-btn.visible { display: block; }
+  .copy-btn:hover { color: #3a475a; border-color: #c5cad3; }
+  .hist-num { font-family: var(--mono); font-size: 9px; color: var(--accent); flex-shrink: 0; }
+  .hist-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
+</head>
+<body data-mode="pro" data-expanded="false">
+
+<!-- Pip + mode name -->
+<div class="mascot-row">
+  <div class="pip-wrap expand-only" data-mode="pro" id="pipWrap">
+    <svg viewBox="0 0 32 32" id="pipSvg" data-hat="pro"></svg>
+  </div>
+  <div class="mode-block">
+    <div class="mode-name"><span class="accent-dot"></span><span id="modeLbl">Professionnel</span></div>
+    <span class="kbd">⌘↵</span>
+  </div>
+  <button class="expand-toggle" id="expandToggle" onclick="toggleExpand()" title="Plus d'options">⌄</button>
+</div>
+
+<!-- Input text -->
+<div class="lbl expand-only"><span>Texte sélectionné</span><span class="hint" id="srcHint">—</span></div>
+<div class="box expand-only" id="inputBox">En attente du texte…</div>
+
+<!-- Instruction (custom only) -->
+<div class="instr-row" id="instrRow">
+  <div class="lbl"><span>Instruction</span><span class="hint">votre requête</span></div>
+  <div class="instr">
+    <span class="i-icon">/</span>
+    <input id="instrInput" type="text" placeholder="ex : traduire en anglais, ton neutre" />
+  </div>
+</div>
+
+<!-- Output -->
+<div class="lbl"><span>Réécriture</span><span class="hint" id="outHint">—</span></div>
+<div class="box out" id="outputBox">
+  <span class="status" id="statusSpan">En attente…</span>
+  <span id="outContent" style="display:none"></span>
+  <span class="cursor hidden" id="cursorEl"></span>
+</div>
+
+<!-- Copy button -->
+<button class="copy-btn" id="copyBtn" onclick="copyOutput()">copier ↗</button>
+
+<!-- Accept / Revise (shown once a correction is ready) -->
+<div class="review-row" id="reviewRow">
+  <button class="btn-accept" onclick="acceptResult()">Accepter</button>
+  <button class="btn-revise" onclick="reviseResult()">✦ Réviser avec l'IA</button>
+</div>
+
+<!-- Mode chips -->
+<div class="chips">
+  <button class="chip active" data-mode="pro"    onclick="chipClick('pro')">Pro</button>
+  <button class="chip"        data-mode="casual" onclick="chipClick('casual')">Décontracté</button>
+  <button class="chip"        data-mode="custom" onclick="chipClick('custom')">Perso</button>
+</div>
+
+<!-- Repolir button -->
+<button class="btn expand-only" id="repolirBtn" onclick="startPolish()">
+  <span>✦</span><span>Repolir</span><span class="sub">⌘↵</span>
+</button>
+
+<!-- History bar + drawer -->
+<div class="hist expand-only">
+  <div class="hist-left">
+    <span class="pill" onclick="toggleDrawer()">HISTORIQUE</span>
+    <span id="histLbl">0 sur 10</span>
+  </div>
+  <div class="dots" id="histDots"></div>
+</div>
+<div class="hist-drawer expand-only" id="histDrawer"></div>
+
+<script>
+// ── Pip mascot (data-driven SVG) ──────────────────────────────────────────
+const SVG_NS = "http://www.w3.org/2000/svg";
+const BODY = [
+  [10, 7,12, 1,"$pb"],[9, 8,14,17,"$pb"],[10,25,12, 1,"$pb"],
+  [11,26,10, 1,"$pb"],[12,27, 8, 1,"$pb"],
+  [13,28, 6, 1,"#7d8794"],[14,29, 4, 1,"#5d6773"],[15,30, 2, 1,"#3f4651"],
+  [21, 8, 2,17,"$pb2"],[20,25, 2, 1,"$pb2"],[19,26, 2, 1,"$pb2"],[18,27, 2, 1,"$pb2"],
+  [ 9, 9, 1,15,"$pb3"],
+  [ 9,21,14, 1,"$pb4"],[ 9,22,14, 1,"$pb5"],
+  [10, 9,12,12,"#c9cdd4"],[21, 9, 1,12,"#9ea4ae"],[10,20,12, 1,"#9ea4ae"],
+  [10, 9,11, 1,"#dcdfe4"],[10,10, 1,10,"#d4d8df"],
+  [12,11, 3, 1,"#8a8f98"],[17,11, 3, 1,"#8a8f98"],
+  [12,12, 3, 3,"#0a1422"],[17,12, 3, 3,"#0a1422"],
+  [12,12, 1, 1,"#ffffff"],[17,12, 1, 1,"#ffffff"],
+  [14,14, 1, 1,"#5a6a7e"],[19,14, 1, 1,"#5a6a7e"],
+  [14,18, 4, 1,"#0a1422"],
+  [13,17, 1, 1,"#0a1422"],[18,17, 1, 1,"#0a1422"],
+  [12,16, 1, 1,"#0a1422"],[19,16, 1, 1,"#0a1422"],
+  [11,15, 1, 1,"#b5b9c1"],[20,15, 1, 1,"#b5b9c1"],
+];
+const HATS = {
+  pro:[
+    [10, 7,12, 1,"#0a1422"],[ 8, 5,16, 2,"#162a47"],[ 9, 4,14, 1,"#162a47"],
+    [10, 3,12, 1,"#162a47"],[12, 2, 8, 1,"#162a47"],
+    [23, 5, 2, 2,"#1f3a5f"],[24, 4, 1, 2,"#1f3a5f"],
+    [11, 3, 3, 1,"#2a4973"],[12, 4, 4, 1,"#223e64"],[13, 5, 3, 1,"#2a4973"],
+    [15, 1, 2, 1,"#0a1422"],
+    [15,19, 2, 1,"#0a1422"],[14,20, 4, 1,"#0a1422"],
+    [15,21, 2, 2,"#0a1422"],[15,21, 2, 1,"#13233a"],[16,21, 1, 1,"#0a1422"],
+  ],
+  casual:[
+    [10, 6,12, 2,"#162a47"],[10, 5,12, 1,"#1a3052"],[11, 4,10, 1,"#1f3a5f"],
+    [12, 3, 8, 1,"#1f3a5f"],[13, 2, 6, 1,"#1f3a5f"],[16, 2, 1, 4,"#2a4973"],
+    [18, 7,10, 1,"#13233a"],[19, 8, 9, 1,"#0a1422"],[21, 9, 5, 1,"#0a1422"],
+    [23, 8, 2, 1,"#c9cdd4"],[15, 5, 2, 1,"#6a9e7f"],[16, 4, 1, 1,"#8cbb9e"],
+    [15, 1, 2, 1,"#0a1422"],
+  ],
+  custom:[
+    [ 7, 7,18, 1,"#3a2f6b"],[ 8, 8,16, 1,"#2b2352"],
+    [ 9, 6,14, 1,"#4a3f80"],[10, 5,12, 1,"#4a3f80"],[11, 4,10, 1,"#4a3f80"],
+    [12, 3, 8, 1,"#4a3f80"],[13, 2, 6, 1,"#4a3f80"],[14, 1, 4, 1,"#4a3f80"],
+    [15, 0, 2, 1,"#4a3f80"],
+    [19, 5, 3, 1,"#33295e"],[18, 4, 3, 1,"#33295e"],[17, 3, 3, 1,"#33295e"],
+    [16, 2, 3, 1,"#33295e"],[16, 1, 2, 1,"#33295e"],
+    [11, 5, 1, 1,"#6159a0"],[12, 4, 1, 1,"#6159a0"],[13, 3, 1, 1,"#6159a0"],[14, 2, 1, 1,"#6159a0"],
+    [14, 5, 3, 1,"#e8c25a"],[15, 4, 1, 3,"#e8c25a"],[15, 5, 1, 1,"#fff2b8"],[18, 3, 1, 1,"#fff2b8"],
+  ],
+};
+function fillTok(t) { return (t && t[0] === '$') ? 'var(--' + t.slice(1) + ')' : t; }
+function mkRect(d) {
+  const r = document.createElementNS(SVG_NS, "rect");
+  r.setAttribute("x",d[0]); r.setAttribute("y",d[1]);
+  r.setAttribute("width",d[2]); r.setAttribute("height",d[3]);
+  r.setAttribute("fill", fillTok(d[4]));
+  return r;
+}
+function renderPip(svg) {
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  BODY.forEach(d => svg.appendChild(mkRect(d)));
+  (HATS[svg.getAttribute("data-hat")] || []).forEach(d => svg.appendChild(mkRect(d)));
+}
+renderPip(document.getElementById("pipSvg"));
+
+// ── State ───────────────────────────────────────────────────────────────────
+let currentMode = "pro";
+let busy = false;
+let expanded = false;
+const MODE_LABELS = { pro:"Professionnel", casual:"Décontracté", custom:"Personnalisé" };
+
+function send(msg) {
+  window.webkit.messageHandlers.bridge.postMessage(msg);
+}
+
+// ── Compact / expanded ────────────────────────────────────────────────────
+function setExpanded(value) {
+  expanded = value;
+  document.body.setAttribute("data-expanded", value ? "true" : "false");
+  send({ type: "expand", value });
+}
+
+function toggleExpand() {
+  setExpanded(!expanded);
+}
+
+// ── Mode ────────────────────────────────────────────────────────────────────
+function _applyMode(mode) {
+  currentMode = mode;
+  document.body.setAttribute("data-mode", mode);
+  document.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", c.dataset.mode === mode));
+  const pip = document.getElementById("pipWrap");
+  pip.setAttribute("data-mode", mode);
+  const svg = document.getElementById("pipSvg");
+  svg.setAttribute("data-hat", mode);
+  renderPip(svg);
+  document.getElementById("modeLbl").textContent  = MODE_LABELS[mode];
+  document.getElementById("instrRow").classList.toggle("show", mode === "custom");
+}
+
+function chipClick(mode) {
+  if (mode === "custom") {
+    setExpanded(true);
+    _applyMode(mode);
+    document.getElementById("instrInput").focus();
+    return;
+  }
+  _applyMode(mode);
+  if (!busy) {
+    send({ type: "polish", mode });
+  }
+}
+
+// ── Polish ──────────────────────────────────────────────────────────────────
+function startPolish() {
+  if (busy) return;
+  if (currentMode === "custom") {
+    const instr = document.getElementById("instrInput").value.trim();
+    if (!instr) { document.getElementById("instrInput").focus(); return; }
+    send({ type:"polish", mode:"custom", instruction:instr });
+  } else {
+    send({ type:"polish", mode:currentMode });
+  }
+}
+
+// ── History drawer ──────────────────────────────────────────────────────────
+function toggleDrawer() {
+  document.getElementById("histDrawer").classList.toggle("open");
+}
+
+// ── Copy ────────────────────────────────────────────────────────────────────
+function copyOutput() {
+  const text = document.getElementById("outContent").textContent;
+  if (!text) return;
+  navigator.clipboard.writeText(text).catch(() => {});
+  const btn = document.getElementById("copyBtn");
+  btn.textContent = "copié ✓";
+  setTimeout(() => { btn.textContent = "copier ↗"; }, 1500);
+}
+
+// ── Review (accept / revise) ─────────────────────────────────────────────────
+function acceptResult() {
+  send({ type: "accept" });
+}
+
+function reviseResult() {
+  setExpanded(true);
+  _applyMode("custom");
+  document.getElementById("instrInput").focus();
+}
+
+// ── App interface (called by Python via evaluateJavaScript) ─────────────────
+window.App = {
+
+  setInputText(text) {
+    document.getElementById("inputBox").textContent = text;
+  },
+
+  setMode(mode) {
+    _applyMode(mode);
+  },
+
+  setSourceApp(name) {
+    document.getElementById("srcHint").textContent = name ? "depuis " + name : "—";
+  },
+
+  onPolishStart() {
+    busy = true;
+    document.getElementById("repolirBtn").disabled = true;
+    document.getElementById("outContent").style.display  = "none";
+    document.getElementById("cursorEl").classList.add("hidden");
+    document.getElementById("reviewRow").classList.remove("show");
+    const s = document.getElementById("statusSpan");
+    s.textContent = "Préparation…"; s.style.color = "#9da8b5"; s.style.display = "inline";
+    document.getElementById("outHint").textContent = "—";
+  },
+
+  setStatus(msg) {
+    const s = document.getElementById("statusSpan");
+    s.textContent = msg; s.style.color = "#9da8b5"; s.style.display = "inline";
+  },
+
+  startStream() {
+    document.getElementById("outContent").textContent = "";
+    document.getElementById("outContent").style.display = "inline";
+    document.getElementById("statusSpan").style.display = "none";
+    document.getElementById("cursorEl").classList.remove("hidden");
+    document.getElementById("outHint").textContent = "en cours…";
+  },
+
+  appendToken(tok) {
+    document.getElementById("outContent").textContent += tok;
+  },
+
+  onDone() {
+    busy = false;
+    document.getElementById("cursorEl").classList.add("hidden");
+    document.getElementById("repolirBtn").disabled = false;
+    document.getElementById("outHint").textContent = "Gemini";
+    document.getElementById("copyBtn").classList.add("visible");
+  },
+
+  setDiff(segments) {
+    const el = document.getElementById("outContent");
+    el.innerHTML = "";
+    segments.forEach(seg => {
+      if (seg.op === "equal") {
+        el.appendChild(document.createTextNode(seg.text));
+      } else if (seg.op === "delete") {
+        const d = document.createElement("del");
+        d.className = "diff-del";
+        d.textContent = seg.text;
+        el.appendChild(d);
+      } else if (seg.op === "insert") {
+        const i = document.createElement("ins");
+        i.className = "diff-ins";
+        i.textContent = seg.text;
+        el.appendChild(i);
+      }
+    });
+    el.style.display = "inline";
+    document.getElementById("reviewRow").classList.add("show");
+  },
+
+  onError(msg) {
+    busy = false;
+    document.getElementById("copyBtn").classList.remove("visible");
+    document.getElementById("cursorEl").classList.add("hidden");
+    document.getElementById("outContent").style.display = "none";
+    document.getElementById("reviewRow").classList.remove("show");
+    const s = document.getElementById("statusSpan");
+    s.textContent = msg; s.style.color = "#b94040"; s.style.display = "inline";
+    document.getElementById("repolirBtn").disabled = false;
+    document.getElementById("outHint").textContent = "erreur";
+  },
+
+  updateHistory(items) {
+    const n = items.length;
+    document.getElementById("histLbl").textContent = n + " sur 10" + (n > 0 ? " · ↵ pour coller" : "");
+    const dots = document.getElementById("histDots");
+    dots.innerHTML = "";
+    for (let i = 0; i < 6; i++) {
+      const d = document.createElement("i");
+      if (i === n - 1 && n > 0) d.classList.add("current");
+      else if (i < n) d.classList.add("filled");
+      dots.appendChild(d);
+    }
+    const drawer = document.getElementById("histDrawer");
+    drawer.innerHTML = "";
+    items.forEach((item, i) => {
+      const el = document.createElement("div");
+      el.className = "hist-item";
+      el.innerHTML = `<span class="hist-num">${String(i+1).padStart(2,"0")}</span>`
+                   + `<span class="hist-txt">${esc(item.preview)}</span>`;
+      el.onclick = () => {
+        document.getElementById("outContent").textContent = item.corrected;
+        document.getElementById("outContent").style.display = "inline";
+        document.getElementById("statusSpan").style.display = "none";
+        document.getElementById("cursorEl").classList.add("hidden");
+        document.getElementById("reviewRow").classList.remove("show");
+        drawer.classList.remove("open");
+      };
+      drawer.appendChild(el);
+    });
+  },
+
+  reset() {
+    busy = false;
+    expanded = false;
+    document.body.setAttribute("data-expanded", "false");
+    document.getElementById("srcHint").textContent         = "—";
+    document.getElementById("copyBtn").classList.remove("visible");
+    document.getElementById("copyBtn").textContent         = "copier ↗";
+    document.getElementById("inputBox").textContent        = "En attente du texte…";
+    document.getElementById("outContent").textContent      = "";
+    document.getElementById("outContent").style.display    = "none";
+    document.getElementById("histDrawer").classList.remove("open");
+    document.getElementById("cursorEl").classList.add("hidden");
+    document.getElementById("reviewRow").classList.remove("show");
+    document.getElementById("repolirBtn").disabled          = false;
+    document.getElementById("instrInput").value             = "";
+    document.getElementById("outHint").textContent          = "—";
+    const s = document.getElementById("statusSpan");
+    s.textContent = "En attente…"; s.style.color = "#9da8b5"; s.style.display = "inline";
+  },
+};
+
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ── Keyboard ────────────────────────────────────────────────────────────────
+document.addEventListener("keydown", e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); startPolish(); }
+  if (e.key === "Escape") send({ type:"close" });
+});
+</script>
+</body>
+</html>

@@ -22,7 +22,7 @@ from AppKit import (
 
 from config import SHORTCUT
 from platforms.macos.hotkey import install as install_hotkey
-from platforms.macos.ui import setup as setup_panel
+from platforms.macos.ui import setup as setup_panel, show_accessibility_denied_alert
 
 
 def main() -> None:
@@ -31,7 +31,10 @@ def main() -> None:
     NSApp.finishLaunching()
 
     panel = setup_panel()
-    install_hotkey(SHORTCUT, panel.trigger_polish)
+    install_hotkey(
+        SHORTCUT, panel.trigger_polish,
+        on_permission_denied=show_accessibility_denied_alert,
+    )
 
     print(f"TextPolish Cloud started — shortcut active: {SHORTCUT}")
     print("Press Ctrl+C in this terminal to quit.")
