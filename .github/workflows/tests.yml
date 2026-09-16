@@ -19,7 +19,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install test dependencies
-        run: pip install pytest
+        run: pip install pytest pyperclip
 
       - name: Run tests
         run: pytest tests/ -v
