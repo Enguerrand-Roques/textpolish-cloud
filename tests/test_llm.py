@@ -72,6 +72,30 @@ class TestPolishText:
             with pytest.raises(Exception, match="API error"):
                 polish_text("Hello", mode="pro")
 
+    def test_quota_exceeded_raises_readable_message(self):
+        err = llm.errors.ClientError(code=429, message="RESOURCE_EXHAUSTED")
+        with patch.object(llm._client.models, "generate_content", side_effect=err):
+            with pytest.raises(RuntimeError, match="quota exceeded"):
+                polish_text("Hello", mode="pro")
+
+    def test_invalid_api_key_raises_readable_message(self):
+        err = llm.errors.ClientError(code=401, message="UNAUTHENTICATED")
+        with patch.object(llm._client.models, "generate_content", side_effect=err):
+            with pytest.raises(RuntimeError, match="rejected the API key"):
+                polish_text("Hello", mode="pro")
+
+    def test_other_client_error_includes_code_and_message(self):
+        err = llm.errors.ClientError(code=400, message="INVALID_ARGUMENT")
+        with patch.object(llm._client.models, "generate_content", side_effect=err):
+            with pytest.raises(RuntimeError, match="400"):
+                polish_text("Hello", mode="pro")
+
+    def test_server_error_raises_readable_message(self):
+        err = llm.errors.ServerError(code=503, message="UNAVAILABLE")
+        with patch.object(llm._client.models, "generate_content", side_effect=err):
+            with pytest.raises(RuntimeError, match="Gemini is having issues"):
+                polish_text("Hello", mode="pro")
+
     def test_whitespace_only_text_returned_as_is(self):
         result = polish_text("\n\t  ")
         assert result == "\n\t  "

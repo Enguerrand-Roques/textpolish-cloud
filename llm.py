@@ -6,7 +6,13 @@ import os
 import logging
 from google import genai
 from google.genai import types
+from google.genai import errors
 from config import GEMINI_API_KEY, GEMINI_MODEL
+
+try:
+    from config import GEMINI_TIMEOUT
+except ImportError:
+    GEMINI_TIMEOUT = 30  # seconds
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -17,7 +23,10 @@ _PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 
 _client = genai.Client(
     api_key=GEMINI_API_KEY,
-    http_options=types.HttpOptions(api_version="v1"),
+    http_options=types.HttpOptions(
+        api_version="v1",
+        timeout=GEMINI_TIMEOUT * 1000,  # HttpOptions.timeout is in milliseconds
+    ),
 )
 
 
@@ -67,23 +76,40 @@ def polish_text(
     logging.debug("Calling Gemini | model=%s | mode=%s | %d chars | stream=%s",
                   GEMINI_MODEL, mode, len(text), on_token is not None)
 
-    if on_token is not None:
-        parts: list[str] = []
-        for chunk in _client.models.generate_content_stream(
-            model=GEMINI_MODEL,
-            contents=user_message,
-        ):
-            token = chunk.text or ""
-            if token:
-                on_token(token)
-                parts.append(token)
-        result = "".join(parts).strip()
-    else:
-        response = _client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=user_message,
+    try:
+        if on_token is not None:
+            parts: list[str] = []
+            for chunk in _client.models.generate_content_stream(
+                model=GEMINI_MODEL,
+                contents=user_message,
+            ):
+                token = chunk.text or ""
+                if token:
+                    on_token(token)
+                    parts.append(token)
+            result = "".join(parts).strip()
+        else:
+            response = _client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=user_message,
+            )
+            result = response.text.strip()
+    except errors.ClientError as e:
+        if e.code == 429:
+            raise RuntimeError(
+                "Gemini quota exceeded for today. Free tier resets daily — "
+                "try again later, or check your usage at https://aistudio.google.com"
+            )
+        if e.code in (401, 403):
+            raise RuntimeError(
+                "Gemini rejected the API key. Check GEMINI_API_KEY in config.py — "
+                "get a new one at https://aistudio.google.com"
+            )
+        raise RuntimeError(f"Gemini request failed ({e.code}): {e.message}")
+    except errors.ServerError as e:
+        raise RuntimeError(
+            f"Gemini is having issues on their end ({e.code}). Try again shortly."
         )
-        result = response.text.strip()
 
     logging.debug("Response received — %d chars", len(result))
     return result
