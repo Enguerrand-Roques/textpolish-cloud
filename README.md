@@ -11,7 +11,7 @@ Select text in any app, press **⌥⌘G**, review the fixes, and the text is pas
   <img src="docs/popup-document.png" width="440" alt="TextPolish Cloud popup under a paragraph in TextEdit, with 8 spelling fixes highlighted and an Apply button">
 </p>
 
-The popup reads the selection, then adapts: one card per correction for short texts, a highlighted document for long ones (above), a single rewrite in Pro/Perso.
+The popup reads the selection, then adapts: one card per correction for short texts, a highlighted document for long ones (above), a single rewrite in Pro / Sur mesure.
 
 > **Prefer a fully offline version?** → [TextPolish](https://github.com/Enguerrand-Roques/textpolish) uses a local Ollama model — no internet required.
 
@@ -21,7 +21,7 @@ The popup reads the selection, then adapts: one card per correction for short te
 
 | Feature | Description |
 |---------|-------------|
-| **Three modes** | Correction (fixes mistakes only, default), Pro (⌘2, professional rewrite), Perso (⌘3, your instruction: translate, shorten, warmer…) |
+| **Three modes** | Correction (fixes mistakes only, default), Pro (⌘2, professional rewrite), Sur mesure (⌘3, your own request: translate, shorten, warmer…) |
 | **Review before pasting** | Accept or ignore each fix (↵ / ⇥), or everything at once (⌘↵) |
 | **Streaming output** | Corrected text appears word by word as Gemini generates — no waiting for the full response |
 | **Correction history** | Last 10 corrections available in the ✏️ menu → History. Click any entry to copy |
@@ -193,7 +193,9 @@ Available models (all on the free tier):
 |------|----------|
 | **Correction** (default) | SMS, DMs, notes — fixes mistakes, keeps your words and tone |
 | **Pro** (⌘2) | Emails, reports, LinkedIn, formal writing |
-| **Perso** (⌘3) | Any instruction: translate, shorten, warmer, funnier |
+| **Sur mesure** (⌘3) | Your own request: translate, shorten, warmer, funnier |
+
+**Speed:** about 0.5 s per request, measured on `gemini-2.5-flash-lite`; the first request after launch is no slower, since there is no model to load. Depends on your connection. The free tier allows 10 requests per minute.
 
 ---
 
