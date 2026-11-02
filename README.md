@@ -5,7 +5,13 @@
 
 **TextPolish Cloud** polishes your text using Google Gemini — free, fast, no local model needed.
 
-Select text in any app, press a shortcut, pick a rewrite mode, and the corrected text is pasted back instantly. Runs silently in the menubar / system tray.
+Select text in any app, press **⌥⌘G**, review the fixes, and the text is pasted back. Runs silently in the menubar / system tray.
+
+<p align="center">
+  <img src="docs/popup-document.png" width="440" alt="TextPolish Cloud popup under a paragraph in TextEdit, with 8 spelling fixes highlighted and an Apply button">
+</p>
+
+The popup reads the selection, then adapts: one card per correction for short texts, a highlighted document for long ones (above), a single rewrite in Pro/Perso.
 
 > **Prefer a fully offline version?** → [TextPolish](https://github.com/Enguerrand-Roques/textpolish) uses a local Ollama model — no internet required.
 
@@ -15,10 +21,11 @@ Select text in any app, press a shortcut, pick a rewrite mode, and the corrected
 
 | Feature | Description |
 |---------|-------------|
-| **Three rewrite modes** | Professional (full rewrite), Casual (light touch, keeps tone), Custom (any instruction) |
+| **Three modes** | Correction (fixes mistakes only, default), Pro (⌘2, professional rewrite), Perso (⌘3, your instruction: translate, shorten, warmer…) |
+| **Review before pasting** | Accept or ignore each fix (↵ / ⇥), or everything at once (⌘↵) |
 | **Streaming output** | Corrected text appears word by word as Gemini generates — no waiting for the full response |
 | **Correction history** | Last 10 corrections available in the ✏️ menu → History. Click any entry to copy |
-| **Fully private prompts** | Your text is sent to Gemini only during the request — no logging, no storage |
+| **Privacy** | Your text is sent to Google Gemini for each request and the app does not log it. On the free tier Google may use requests to improve its products — use [TextPolish](https://github.com/Enguerrand-Roques/textpolish) (local) for sensitive text |
 | **System-level** | Works in any app — VS Code, Notion, Mail, Slack. Panel stays above fullscreen apps |
 | **Free tier** | 1 500 requests/day on Gemini free tier — no credit card required |
 
@@ -167,7 +174,7 @@ Edit `config.py` (excluded from Git — never committed):
 ```python
 GEMINI_API_KEY = "your-key-here"
 GEMINI_MODEL   = "gemini-2.5-flash-lite"   # recommended — fast and free
-SHORTCUT       = "<cmd>+<shift>+p"         # auto-mapped to Ctrl on Windows
+SHORTCUT       = "<cmd>+<alt>+g"           # auto-mapped to Ctrl on Windows
 ```
 
 Available models (all on the free tier):
@@ -180,13 +187,13 @@ Available models (all on the free tier):
 
 ---
 
-## Rewrite Modes
+## Modes
 
 | Mode | Best for |
 |------|----------|
-| **Professional** | Emails, reports, LinkedIn, formal writing |
-| **Casual** | SMS, WhatsApp, DMs — light touch, keeps your tone |
-| **Custom** | Any instruction you type freely |
+| **Correction** (default) | SMS, DMs, notes — fixes mistakes, keeps your words and tone |
+| **Pro** (⌘2) | Emails, reports, LinkedIn, formal writing |
+| **Perso** (⌘3) | Any instruction: translate, shorten, warmer, funnier |
 
 ---
 
