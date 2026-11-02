@@ -42,6 +42,29 @@ class TestPolishText:
             mock_gen.assert_not_called()
             assert result == "   "
 
+    def test_text_over_limit_is_rejected_without_calling_gemini(self):
+        with patch.object(llm._client.models, "generate_content") as mock_gen:
+            with pytest.raises(RuntimeError, match="too long"):
+                polish_text("a" * (llm.MAX_INPUT_CHARS + 1), mode="casual")
+            mock_gen.assert_not_called()
+
+    def test_correction_is_deterministic_rewrites_are_not(self):
+        mock_response = MagicMock()
+        mock_response.text = "ok"
+        # The SDK is mocked in conftest: check what the config was built with.
+        with patch.object(llm._client.models, "generate_content", return_value=mock_response), \
+                patch.object(llm.types, "GenerateContentConfig") as mock_cfg:
+            polish_text("Hello", mode="casual")
+            assert mock_cfg.call_args.kwargs["temperature"] == 0
+            polish_text("Hello", mode="pro")
+            assert mock_cfg.call_args.kwargs["temperature"] > 0
+
+    def test_markdown_bold_added_by_the_model_is_removed(self):
+        mock_response = MagicMock()
+        mock_response.text = "Le **rapport** est fini"
+        with patch.object(llm._client.models, "generate_content", return_value=mock_response):
+            assert polish_text("Le raport est fini", mode="casual") == "Le rapport est fini"
+
     def test_successful_response_returns_text(self):
         mock_response = MagicMock()
         mock_response.text = "  Hello, world!  "

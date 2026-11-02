@@ -14,10 +14,16 @@ try:
 except ImportError:
     GEMINI_TIMEOUT = 30  # seconds
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
+# Long inputs are slow and costly on the free tier; the popup shows this
+# error instead of hanging.
+MAX_INPUT_CHARS = 4000
+
+# Correction should give the same fix every time; rewrites keep a little variety.
+_TEMPERATURE = {"casual": 0.0, "pro": 0.4, "custom": 0.4}
+
+# The SDK logs every request at INFO; keep the app log to our own lines.
+for _name in ("httpx", "google_genai"):
+    logging.getLogger(_name).setLevel(logging.WARNING)
 
 _PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 
@@ -59,6 +65,12 @@ def polish_text(
     if not text.strip():
         return text
 
+    if len(text) > MAX_INPUT_CHARS:
+        raise RuntimeError(
+            f"Text too long ({len(text)} characters, max {MAX_INPUT_CHARS}). "
+            "Select a shorter passage."
+        )
+
     prompt_name = "custom" if custom_prompt else mode
     system = _load_prompt(prompt_name)
 
@@ -76,12 +88,15 @@ def polish_text(
     logging.debug("Calling Gemini | model=%s | mode=%s | %d chars | stream=%s",
                   GEMINI_MODEL, mode, len(text), on_token is not None)
 
+    config = types.GenerateContentConfig(temperature=_TEMPERATURE.get(mode, 0.4))
+
     try:
         if on_token is not None:
             parts: list[str] = []
             for chunk in _client.models.generate_content_stream(
                 model=GEMINI_MODEL,
                 contents=user_message,
+                config=config,
             ):
                 token = chunk.text or ""
                 if token:
@@ -92,6 +107,7 @@ def polish_text(
             response = _client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=user_message,
+                config=config,
             )
             result = response.text.strip()
     except errors.ClientError as e:
@@ -110,6 +126,12 @@ def polish_text(
         raise RuntimeError(
             f"Gemini is having issues on their end ({e.code}). Try again shortly."
         )
+
+    # Models sometimes wrap the words they changed in Markdown bold.
+    if "**" not in text:
+        result = result.replace("**", "")
+    if "__" not in text:
+        result = result.replace("__", "")
 
     logging.debug("Response received — %d chars", len(result))
     return result

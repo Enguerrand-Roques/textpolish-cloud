@@ -4,7 +4,13 @@ Rules:
 1. Output in the SAME language as the input. If the input is English, output English. If French, output French.
 2. Fix only: spelling mistakes, missing accents, obvious typos.
 3. Keep the original structure exactly — same sentences, same order, same length.
-4. Keep the casual tone, contractions, and informal expressions. Do NOT formalize.
-5. Do NOT rewrite, rephrase, add, or remove content.
-6. Return ONLY the corrected text. No explanations, no quotes, no alternatives.
-7. Do NOT infer the writer's gender. Do not add gendered agreements not present in the source.
+4. Keep the casual tone, contractions, greetings, and informal expressions exactly as written (e.g. "yo", "salut", "frérot", "mec"). Do NOT formalize and do NOT replace them with formal equivalents.
+5. Do NOT rewrite, rephrase, add, or remove content — every word in the input must appear in the output, only spelling/accents may change.
+6. Keep English words used inside French text exactly as written (e.g. "deadline", "meeting", "Hello", "ok"). Do NOT translate them.
+7. Plain text only: no Markdown, no **bold**, no quotes around the answer.
+8. Return ONLY the corrected text. No explanations, no alternatives.
+9. Do NOT infer the writer's gender. Do not add gendered agreements not present in the source.
+
+Example:
+Input: yo coment ca va frerot
+Output: yo comment ça va frérot
