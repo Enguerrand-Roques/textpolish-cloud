@@ -3,6 +3,7 @@ the strikethrough/highlight suggestion popup.
 """
 
 import difflib
+import os
 import re
 import unicodedata
 
@@ -40,6 +41,8 @@ KIND_LABELS = {
     "case": "Majuscule",
     "punctuation": "Ponctuation",
     "spelling": "Orthographe",
+    "agreement": "Accord",
+    "conjugation": "Conjugaison",
     "grammar": "Grammaire",
     "rewrite": "Reformulation",
 }
@@ -69,6 +72,37 @@ def _letters_only(s: str) -> str:
     return "".join(c for c in s if c.isalnum())
 
 
+# Verb endings that small typos swap: valider/validé, finit/fini, était/été…
+_VERB_ENDINGS = {
+    "er", "é", "ée", "és", "ées", "ez", "ai", "ais", "ait", "aient", "as", "a",
+    "ons", "ont", "i", "is", "it", "ir", "u", "us", "ue", "ues", "ra", "ras",
+    "rai", "rait", "ront", "ent", "x", "t",
+}
+
+# French words that sound alike and get swapped: a/à, ces/c'est, sa/ça…
+_HOMOPHONES = {
+    "a", "à", "ces", "ses", "c'est", "s'est", "sait", "sa", "ça", "ce", "se", "et", "est",
+    "ou", "où", "on", "ont", "son", "sont", "la", "là", "l'a", "leur", "leurs",
+    "quel", "quelle", "qu'elle", "peu", "peut", "mes", "mais", "m'est",
+}
+
+
+def _is_agreement(b: str, a: str) -> bool:
+    """Same word, only a plural/feminine ending added or removed (bon/bons)."""
+    short, long_ = sorted((b, a), key=len)
+    return long_[:len(short)] == short and long_[len(short):] in {"s", "x", "e", "es"}
+
+
+def _is_conjugation(b: str, a: str) -> bool:
+    """Same stem, two different verb endings (valider → validés)."""
+    prefix = len(os.path.commonprefix([b, a]))
+    for k in range(prefix, max(1, prefix - 3), -1):
+        eb, ea = b[k:], a[k:]
+        if eb != ea and eb in _VERB_ENDINGS and ea in _VERB_ENDINGS:
+            return True
+    return False
+
+
 def classify_change(before: str, after: str) -> str:
     """Rough type of a correction, for the label shown on its card."""
     b, a = before.strip(), after.strip()
@@ -76,10 +110,17 @@ def classify_change(before: str, after: str) -> str:
         return "punctuation"
     if b.lower() == a.lower():
         return "case"
+    if b.lower() in _HOMOPHONES and a.lower() in _HOMOPHONES:
+        return "grammar"
     if _strip_accents(b).lower() == _strip_accents(a).lower():
         return "accent"
     if _letters_only(b).lower() == _letters_only(a).lower():
         return "punctuation"
+    one_word = len(b.split()) == 1 and len(a.split()) == 1
+    if one_word and _is_agreement(b.lower(), a.lower()):
+        return "agreement"
+    if one_word and _is_conjugation(b.lower(), a.lower()):
+        return "conjugation"
     if b and a and len(b.split()) <= 2 and len(a.split()) <= 2:
         ratio = difflib.SequenceMatcher(
             a=_strip_accents(b).lower(), b=_strip_accents(a).lower()

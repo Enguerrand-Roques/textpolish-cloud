@@ -24,6 +24,7 @@
     --red:    #ff3b30;
     --orange: #ff9500;
     --green:  #34c759;
+    --teal:   #0a9db8;
 
     --accent: var(--blue);
     --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
@@ -44,7 +45,7 @@
       --shadow:     0 1px 2px rgba(0,0,0,0.3), 0 6px 18px rgba(0,0,0,0.25);
       --window-bg:  rgba(40, 40, 44, 0.97);
       --blue:   #0a84ff; --indigo: #5e5ce6; --purple: #bf5af2;
-      --red:    #ff453a; --orange: #ff9f0a; --green:  #30d158;
+      --red:    #ff453a; --orange: #ff9f0a; --green:  #30d158; --teal: #40c8e0;
     }
   }
   :root[data-theme="dark"] {
@@ -60,7 +61,7 @@
     --shadow:     0 1px 2px rgba(0,0,0,0.3), 0 6px 18px rgba(0,0,0,0.25);
     --window-bg:  rgba(40, 40, 44, 0.97);
     --blue:   #0a84ff; --indigo: #5e5ce6; --purple: #bf5af2;
-    --red:    #ff453a; --orange: #ff9f0a; --green:  #30d158;
+    --red:    #ff453a; --orange: #ff9f0a; --green:  #30d158; --teal: #40c8e0;
   }
   body[data-mode="casual"] { --accent: var(--blue); }
   body[data-mode="pro"]    { --accent: var(--indigo); }
@@ -220,7 +221,8 @@
   .kind { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: var(--k); }
   .kind i { width: 7px; height: 7px; border-radius: 50%; background: var(--k); }
   .kind .count { margin-left: auto; font-weight: 500; color: var(--tertiary); font-variant-numeric: tabular-nums; }
-  [data-kind="spelling"], [data-kind="accent"], [data-kind="case"], [data-kind="grammar"] { --k: var(--red); }
+  [data-kind="spelling"], [data-kind="accent"], [data-kind="case"] { --k: var(--red); }
+  [data-kind="agreement"], [data-kind="conjugation"], [data-kind="grammar"] { --k: var(--teal); }
   [data-kind="punctuation"] { --k: var(--orange); }
   [data-kind="rewrite"]     { --k: var(--blue); }
 
@@ -269,7 +271,7 @@
   }
   .chg.del { text-decoration: line-through; text-decoration-color: var(--k); color: var(--secondary); }
   .chg.gap::after { content: "＋"; font-size: 10px; color: var(--tertiary); }
-  .legend { display: flex; gap: 14px; white-space: nowrap; padding: 8px 12px 6px; border-top: 0.5px solid var(--separator); font-size: 11px; color: var(--secondary); }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; white-space: nowrap; padding: 8px 12px 6px; border-top: 0.5px solid var(--separator); font-size: 11px; color: var(--secondary); }
   .legend span { display: flex; align-items: center; gap: 5px; }
   .legend i { width: 6px; height: 6px; border-radius: 50%; background: var(--k); }
 
@@ -384,8 +386,6 @@ const ICON = {
   warn:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 L21.5 20 H2.5 Z"/><path d="M12 10v4.5M12 17.4v.1"/></svg>',
   cursor:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 4h6M9 20h6M12 4v16"/></svg>',
 };
-const KIND_ORDER = ["spelling", "accent", "case", "punctuation", "rewrite"];
-const KIND_GROUP = { spelling: "Orthographe", accent: "Orthographe", case: "Orthographe", grammar: "Grammaire", punctuation: "Ponctuation", rewrite: "Style" };
 
 // ── State ───────────────────────────────────────────────────────────────────
 let mode = "casual";
@@ -516,12 +516,12 @@ function renderDoc() {
     paintChange(p, s);
     el.appendChild(s);
   });
-  const counts = {};
-  changes.forEach(c => { const g = KIND_GROUP[c.kind]; counts[g] = (counts[g] || 0) + 1; });
-  const kindOf = { Orthographe: "spelling", Grammaire: "grammar", Ponctuation: "punctuation", Style: "rewrite" };
-  $("legend").innerHTML = Object.entries(counts)
-    .map(([g, n]) => `<span data-kind="${kindOf[g]}"><i></i>${g} ${n}</span>`).join("")
-    ;
+  // One entry per kind of mistake (Conjugaison 5 · Accord 3 · …), most frequent
+  // first; the dot color still groups them (red spelling, teal grammar…).
+  const counts = {}, kindOf = {};
+  changes.forEach(c => { counts[c.label] = (counts[c.label] || 0) + 1; kindOf[c.label] = c.kind; });
+  $("legend").innerHTML = Object.entries(counts).sort((x, y) => y[1] - x[1])
+    .map(([label, n]) => `<span data-kind="${kindOf[label]}"><i></i>${esc(label)} ${n}</span>`).join("");
   updateDocChrome();
 }
 function paintChange(p, s) {

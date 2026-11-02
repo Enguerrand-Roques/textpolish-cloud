@@ -60,6 +60,27 @@ def _changes(parts):
 
 
 class TestClassifyChange:
+    def test_plural_or_feminine_ending_is_agreement(self):
+        assert classify_change("chiffre", "chiffres") == "agreement"
+        assert classify_change("bon", "bons") == "agreement"
+
+    def test_swapped_verb_ending_is_conjugation(self):
+        assert classify_change("valider", "validés") == "conjugation"
+        assert classify_change("finit", "fini") == "conjugation"
+        assert classify_change("était", "été") == "conjugation"
+
+    def test_homophone_swap_is_grammar(self):
+        assert classify_change("ces", "c'est") == "grammar"
+        assert classify_change("sa", "ça") == "grammar"
+        assert classify_change("a", "à") == "grammar"
+
+    def test_person_ending_is_conjugation(self):
+        assert classify_change("peux", "peut") == "conjugation"
+
+    def test_other_one_word_typos_stay_spelling(self):
+        assert classify_change("testes", "tests") == "spelling"
+        assert classify_change("opérationel", "opérationnel") == "spelling"
+
     def test_accent(self):
         assert classify_change("ca", "ça") == "accent"
 
