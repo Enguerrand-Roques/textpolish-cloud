@@ -2,583 +2,680 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
 <style>
+  /* ── Tokens (macOS system colors) ───────────────────────────────────────── */
   :root {
-    --pro:    #5b8db8;
-    --casual: #6a9e7f;
-    --custom: #8b8fc7;
-    --accent: var(--pro);
-    --font:   -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
-    --mono:   'SF Mono', ui-monospace, monospace;
+    --label:      rgba(0, 0, 0, 0.86);
+    --secondary:  rgba(60, 60, 67, 0.62);
+    --tertiary:   rgba(60, 60, 67, 0.34);
+    --fill:       rgba(120, 120, 128, 0.12);
+    --fill-2:     rgba(120, 120, 128, 0.20);
+    --surface:    rgba(255, 255, 255, 0.78);
+    --surface-hi: #ffffff;
+    --card:       #ffffff;
+    --separator:  rgba(60, 60, 67, 0.13);
+    --shadow:     0 1px 2px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.07);
+    --window-bg:  rgba(242, 242, 246, 0.97);
+
+    --blue:   #007aff;
+    --indigo: #5856d6;
+    --purple: #af52de;
+    --red:    #ff3b30;
+    --orange: #ff9500;
+    --green:  #34c759;
+
+    --accent: var(--blue);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    --round: "SF Pro Rounded", -apple-system, BlinkMacSystemFont, sans-serif;
+    --spring: cubic-bezier(0.2, 0.9, 0.25, 1);
   }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --label:      rgba(255, 255, 255, 0.90);
+      --secondary:  rgba(235, 235, 245, 0.60);
+      --tertiary:   rgba(235, 235, 245, 0.30);
+      --fill:       rgba(118, 118, 128, 0.24);
+      --fill-2:     rgba(118, 118, 128, 0.36);
+      --surface:    rgba(255, 255, 255, 0.07);
+      --surface-hi: rgba(255, 255, 255, 0.11);
+      --card:       #38383c;
+      --separator:  rgba(255, 255, 255, 0.10);
+      --shadow:     0 1px 2px rgba(0,0,0,0.3), 0 6px 18px rgba(0,0,0,0.25);
+      --window-bg:  rgba(40, 40, 44, 0.97);
+      --blue:   #0a84ff; --indigo: #5e5ce6; --purple: #bf5af2;
+      --red:    #ff453a; --orange: #ff9f0a; --green:  #30d158;
+    }
+  }
+  :root[data-theme="dark"] {
+    --label:      rgba(255, 255, 255, 0.90);
+    --secondary:  rgba(235, 235, 245, 0.60);
+    --tertiary:   rgba(235, 235, 245, 0.30);
+    --fill:       rgba(118, 118, 128, 0.24);
+    --fill-2:     rgba(118, 118, 128, 0.36);
+    --surface:    rgba(255, 255, 255, 0.07);
+    --surface-hi: rgba(255, 255, 255, 0.11);
+    --card:       #38383c;
+    --separator:  rgba(255, 255, 255, 0.10);
+    --shadow:     0 1px 2px rgba(0,0,0,0.3), 0 6px 18px rgba(0,0,0,0.25);
+    --window-bg:  rgba(40, 40, 44, 0.97);
+    --blue:   #0a84ff; --indigo: #5e5ce6; --purple: #bf5af2;
+    --red:    #ff453a; --orange: #ff9f0a; --green:  #30d158;
+  }
+  body[data-mode="casual"] { --accent: var(--blue); }
+  body[data-mode="pro"]    { --accent: var(--indigo); }
+  body[data-mode="custom"] { --accent: var(--purple); }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #f6f7f9; }
+  html, body { background: transparent; }
+  /* Outside the app (design preview) there is no native vibrancy behind us. */
+  html.no-vibrancy body { background: var(--window-bg); }
   body {
-    font-family: var(--font);
-    color: #1a2330;
-    display: flex; flex-direction: column;
-    padding: 14px; gap: 10px;
+    font: 13px/1.38 var(--font);
+    color: var(--label);
     -webkit-font-smoothing: antialiased;
     -webkit-user-select: none; user-select: none;
+    cursor: default;
+    overflow: hidden;
   }
-  body[data-mode="pro"]    { --accent: var(--pro); }
-  body[data-mode="casual"] { --accent: var(--casual); }
-  body[data-mode="custom"] { --accent: var(--custom); }
+  button { font: inherit; color: inherit; border: none; background: none; cursor: default; }
+  #root { display: flex; flex-direction: column; gap: 12px; padding: 14px 14px 12px; }
 
-  /* Pip mascot */
-  .pip-wrap { width: 48px; height: 48px; flex-shrink: 0; }
-  .pip-wrap svg { image-rendering: pixelated; width: 48px; height: 48px; }
-  .pip-wrap[data-mode="pro"]    { --pb:#5b8db8;--pb2:#3e6b91;--pb3:#7aa7cf;--pb4:#8ab6d8;--pb5:#3a5f7f; }
-  .pip-wrap[data-mode="casual"] { --pb:#6a9e7f;--pb2:#4d7a5e;--pb3:#8cbb9e;--pb4:#9dc7ae;--pb5:#3f6a51; }
-  .pip-wrap[data-mode="custom"] { --pb:#8b8fc7;--pb2:#696ea6;--pb3:#aaadd8;--pb4:#b9bce0;--pb5:#545890; }
-
-  /* Compact vs expanded view */
-  .expand-only { display: block; }
-  body[data-expanded="false"] .expand-only { display: none !important; }
-  .expand-toggle {
-    width: 22px; height: 22px; border-radius: 6px; border: 1px solid #dde1e7;
-    background: #fff; color: #5a6a7e; font-size: 11px; cursor: pointer;
-    display: grid; place-items: center; flex-shrink: 0;
-    transition: transform 0.15s, background 0.1s;
+  /* ── Header ─────────────────────────────────────────────────────────────── */
+  .hdr { display: flex; align-items: center; gap: 9px; min-height: 26px; }
+  .glyph {
+    width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0;
+    background: linear-gradient(160deg,
+      color-mix(in srgb, var(--accent) 80%, white), var(--accent));
+    display: grid; place-items: center;
+    box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.4), 0 1px 3px color-mix(in srgb, var(--accent) 40%, transparent);
+    transition: background 0.35s;
   }
-  .expand-toggle:hover { background: #eceff3; }
-  body[data-expanded="true"] .expand-toggle { transform: rotate(180deg); }
-
-  /* Row: Pip + mode name */
-  .mascot-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .mode-block { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-  .mode-name  { font-size: 13px; font-weight: 600; color: #1a2330; display: flex; align-items: center; gap: 7px; }
-  .accent-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-  .kbd {
-    font-family: var(--mono); font-size: 10px; color: #3a475a;
-    background: #eceff3; border: 1px solid #dde1e7;
-    padding: 2px 6px; border-radius: 4px; letter-spacing: 0.03em;
-  }
-
-  /* Section labels */
-  .lbl {
-    font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
-    color: #6f7a8a; display: flex; align-items: center; justify-content: space-between;
-  }
-  .lbl .hint { color: color-mix(in oklab, var(--accent) 70%, #6f7a8a); }
-
-  /* Text boxes */
-  .box {
-    background: #fff; border: 1px solid #e3e6eb; border-radius: 7px;
-    padding: 9px 10px; font-size: 12px; line-height: 1.45; color: #3a475a;
-    min-height: 62px; white-space: pre-wrap; word-break: break-word;
-    overflow-y: auto; max-height: 100px;
-    -webkit-user-select: text; user-select: text;
-  }
-  .box.out {
-    background: color-mix(in oklab, var(--accent) 8%, #fff);
-    border-color: color-mix(in oklab, var(--accent) 28%, #e3e6eb);
-    color: #1a2330;
-  }
-  .status { font-family: var(--mono); font-size: 10px; color: #9da8b5; }
-  .diff-del {
-    text-decoration: line-through; color: #b94040;
-    background: color-mix(in oklab, #b94040 10%, transparent);
-    border-radius: 2px;
-  }
-  .diff-ins {
-    text-decoration: none; color: #1a2330; font-weight: 600;
-    background: color-mix(in oklab, var(--accent) 22%, transparent);
-    border-radius: 2px;
-  }
-  .cursor {
-    display: inline-block; width: 6px; height: 12px;
-    background: var(--accent); vertical-align: -2px; margin-left: 1px;
-    animation: blink 1.05s steps(1) infinite; border-radius: 1px;
-  }
-  @keyframes blink { 0%,50%{opacity:1} 50.01%,100%{opacity:0} }
-  .cursor.hidden { display: none; }
-
-  /* Instruction row (custom mode) */
-  .instr-row { display: none; flex-direction: column; gap: 8px; }
-  .instr-row.show { display: flex; }
-  .instr {
-    display: flex; align-items: center; gap: 7px;
-    background: #fff; border: 1px solid #e3e6eb; border-radius: 7px;
-    padding: 7px 9px;
-  }
-  .i-icon {
-    width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
-    background: color-mix(in oklab, var(--accent) 14%, #fff);
-    border: 1px solid color-mix(in oklab, var(--accent) 35%, #e3e6eb);
-    color: color-mix(in oklab, var(--accent) 60%, #1a2330);
-    font-size: 9px; display: grid; place-items: center;
-    font-family: var(--mono); font-weight: 600;
-  }
-  .instr input {
-    flex: 1; background: none; border: none; outline: none;
-    font-family: var(--mono); font-size: 11px; color: #3a475a;
-    -webkit-user-select: text; user-select: text;
-  }
-  .instr input::placeholder { color: #9da8b5; }
-
-  /* Mode chips */
-  .chips {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
-    background: #eceff3; padding: 4px; border-radius: 7px;
-    border: 1px solid #dde1e7;
-  }
-  .chip {
-    font-size: 11px; font-weight: 500; color: #5a6a7e;
-    background: transparent; border: none;
-    padding: 6px 0; border-radius: 5px; text-align: center; cursor: pointer;
-    font-family: var(--font); transition: all 0.12s;
-  }
-  .chip.active {
-    background: color-mix(in oklab, var(--accent) 22%, #fff);
-    color: #1a2330;
-    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 50%, transparent);
-  }
-
-  /* Repolir button */
-  .btn {
-    width: 100%; padding: 10px 12px; border-radius: 8px;
-    border: 1px solid color-mix(in oklab, var(--accent) 50%, rgba(255,255,255,0.06));
-    background: linear-gradient(180deg,
-      color-mix(in oklab, var(--accent) 78%, #0c1a2b) 0%,
-      color-mix(in oklab, var(--accent) 62%, #0c1a2b) 100%);
-    color: #fff; font-size: 12.5px; font-weight: 600;
-    display: flex; align-items: center; justify-content: center; gap: 7px;
-    cursor: pointer; font-family: var(--font);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset,
-      0 7px 16px -8px color-mix(in oklab, var(--accent) 70%, transparent);
-    transition: opacity 0.12s;
-  }
-  .btn:hover  { opacity: 0.88; }
-  .btn:active { opacity: 0.78; }
-  .btn:disabled { opacity: 0.5; cursor: default; }
-  .btn .sub { margin-left: auto; font-family: var(--mono); font-size: 10px; opacity: 0.65; }
-
-  /* Accept / Revise row (shown once a result is ready) */
-  .review-row { display: none; gap: 6px; }
-  .review-row.show { display: flex; }
-  .btn-accept, .btn-revise {
-    flex: 1; padding: 9px 10px; border-radius: 8px;
-    font-size: 12px; font-weight: 600; cursor: pointer;
-    font-family: var(--font); transition: opacity 0.12s;
-  }
-  .btn-accept {
-    border: 1px solid color-mix(in oklab, var(--accent) 50%, rgba(255,255,255,0.06));
-    background: linear-gradient(180deg,
-      color-mix(in oklab, var(--accent) 78%, #0c1a2b) 0%,
-      color-mix(in oklab, var(--accent) 62%, #0c1a2b) 100%);
-    color: #fff;
-  }
-  .btn-revise {
-    border: 1px solid #dde1e7; background: #fff; color: #3a475a;
-  }
-  .btn-accept:hover, .btn-revise:hover { opacity: 0.85; }
-  .btn-accept:active, .btn-revise:active { opacity: 0.7; }
-
-  /* History bar */
-  .hist {
-    display: flex; align-items: center; justify-content: space-between;
-    font-family: var(--mono); font-size: 9.5px; color: #8a96a6;
-  }
-  .hist-left { display: flex; align-items: center; gap: 7px; }
+  .glyph svg { width: 15px; height: 15px; }
+  .title { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+  .title b { font-weight: 600; font-size: 13px; letter-spacing: -0.01em; }
+  .title span { font-size: 11px; color: var(--secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pill {
-    background: #eceff3; border: 1px solid #dde1e7; border-radius: 999px;
-    padding: 2px 7px; color: #3a475a; font-size: 9px; cursor: pointer;
-    transition: background 0.1s;
+    margin-left: auto; flex-shrink: 0;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.01em;
+    padding: 3px 9px; border-radius: 999px;
+    background: var(--fill); color: var(--secondary);
+    display: flex; align-items: center; gap: 6px;
+    transition: background 0.25s, color 0.25s;
   }
-  .pill:hover { background: #e3e6eb; }
-  .dots { display: flex; gap: 3px; }
-  .dots i { width: 4px; height: 4px; border-radius: 50%; background: #dde1e7; display: inline-block; }
-  .dots i.filled  { background: color-mix(in oklab, var(--accent) 60%, #c9cdd4); }
-  .dots i.current { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+  .pill[data-tone="accent"] { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+  .pill[data-tone="green"]  { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+  .pill[data-tone="orange"] { background: color-mix(in srgb, var(--orange) 16%, transparent); color: var(--orange); }
+  .pill .spin {
+    width: 9px; height: 9px; border-radius: 50%;
+    border: 1.5px solid currentColor; border-right-color: transparent;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* History drawer */
-  .hist-drawer {
-    margin-top: -4px; background: #eff1f4;
-    border-top: 1px solid #dde1e7; border-radius: 0 0 7px 7px;
-    max-height: 0; overflow: hidden; transition: max-height 0.2s ease;
+  /* ── Segmented control ──────────────────────────────────────────────────── */
+  .seg {
+    position: relative; display: grid; grid-template-columns: repeat(3, 1fr);
+    background: var(--fill); border-radius: 8px; padding: 2px; height: 28px;
   }
-  .hist-drawer.open { max-height: 160px; overflow-y: auto; }
-  .hist-item {
-    padding: 7px 12px; font-size: 11px; color: #3a475a; cursor: pointer;
-    border-bottom: 1px solid #e3e6eb;
-    display: flex; gap: 8px; align-items: baseline;
+  .seg .knob {
+    position: absolute; top: 2px; bottom: 2px; left: 2px;
+    width: calc((100% - 4px) / 3); border-radius: 6px;
+    background: var(--surface-hi);
+    box-shadow: 0 0.5px 0 rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.10), 0 0 0 0.5px rgba(0,0,0,0.05);
+    transition: transform 0.32s var(--spring);
   }
-  .hist-item:last-child { border-bottom: none; }
-  .hist-item:hover { background: #e5e8ec; border-left: 2px solid var(--accent); padding-left: 10px; }
-  .copy-btn {
-    display: none; align-self: flex-end;
-    font-family: var(--mono); font-size: 10px; color: #8a96a6;
-    background: none; border: 1px solid #e3e6eb; border-radius: 5px;
-    padding: 3px 8px; cursor: pointer; transition: all 0.15s;
+  .seg button {
+    position: relative; z-index: 1; font-size: 12px; font-weight: 500;
+    color: var(--secondary); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    transition: color 0.2s;
   }
-  .copy-btn.visible { display: block; }
-  .copy-btn:hover { color: #3a475a; border-color: #c5cad3; }
-  .hist-num { font-family: var(--mono); font-size: 9px; color: var(--accent); flex-shrink: 0; }
-  .hist-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .seg button.on { color: var(--label); font-weight: 600; }
+  .seg button .dot { width: 6px; height: 6px; border-radius: 50%; opacity: 0.9; }
+  body[data-mode="pro"]    .seg .knob { transform: translateX(100%); }
+  body[data-mode="custom"] .seg .knob { transform: translateX(200%); }
+
+  /* ── Mode explanation (what the selected mode will do to the text) ─────── */
+  .hint { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--secondary); margin-top: -4px; padding: 0 2px; }
+  .hint i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; transition: background 0.3s; }
+
+  /* ── Custom instruction ─────────────────────────────────────────────────── */
+  .instr {
+    display: none; align-items: center; gap: 8px;
+    background: var(--surface); border-radius: 9px; padding: 0 6px 0 10px; height: 34px;
+    box-shadow: var(--shadow); animation: rise 0.28s var(--spring);
+  }
+  body[data-mode="custom"] .instr { display: flex; }
+  .instr svg { width: 14px; height: 14px; color: var(--purple); flex-shrink: 0; }
+  .instr input {
+    flex: 1; min-width: 0; border: none; outline: none; background: none;
+    font: inherit; color: var(--label); -webkit-user-select: text; user-select: text;
+  }
+  .instr input::placeholder { color: var(--tertiary); }
+  .presets { display: none; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+  body[data-mode="custom"] .presets { display: flex; }
+  .presets button {
+    height: 24px; padding: 0 9px; border-radius: 999px; font-size: 11.5px; font-weight: 500;
+    background: color-mix(in srgb, var(--purple) 12%, transparent); color: var(--purple);
+    transition: background 0.15s;
+  }
+  .presets button:hover { background: color-mix(in srgb, var(--purple) 20%, transparent); }
+  .reading.idle .txt { animation: none; -webkit-text-fill-color: var(--secondary); background: none; }
+  .reading.idle .bar { display: none; }
+  .instr .go {
+    height: 24px; padding: 0 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+    background: var(--accent); color: white;
+  }
+
+  /* ── Stage & views ──────────────────────────────────────────────────────── */
+  .view:not(.on) { display: none !important; }
+  .view.on { animation: rise 0.32s var(--spring); }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px) scale(0.985); } to { opacity: 1; transform: none; } }
+
+  .surface {
+    background: var(--surface); border-radius: 12px; box-shadow: var(--shadow);
+  }
+
+  /* Reading */
+  .reading { padding: 13px 14px 14px; }
+  .reading .txt {
+    font-size: 13px; line-height: 1.5; max-height: 120px; overflow: hidden;
+    color: var(--tertiary);
+    background: linear-gradient(100deg, var(--tertiary) 30%, var(--label) 50%, var(--tertiary) 70%);
+    background-size: 260% 100%;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    animation: sweep 1.6s ease-in-out infinite;
+    -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  @keyframes sweep { from { background-position: 100% 0; } to { background-position: 0 0; } }
+  .reading .bar { height: 2px; border-radius: 2px; background: var(--fill); overflow: hidden; margin-top: 12px; }
+  .reading .bar i {
+    display: block; height: 100%; width: 35%; border-radius: 2px; background: var(--accent);
+    animation: slide 1.15s ease-in-out infinite;
+  }
+  @keyframes slide { from { transform: translateX(-110%); } to { transform: translateX(310%); } }
+
+  /* Cards */
+  .stack { position: relative; padding-bottom: 0; }
+  .stack[data-left="2"] { padding-bottom: 6px; }
+  .stack[data-left="3"] { padding-bottom: 11px; }
+  .stack::before, .stack::after {
+    content: ""; position: absolute; left: 12px; right: 12px; bottom: 0; height: 40px;
+    border-radius: 12px; background: var(--card); box-shadow: var(--shadow); opacity: 0; z-index: 0;
+    transition: opacity 0.25s;
+  }
+  .stack::after { left: 6px; right: 6px; bottom: 5px; }
+  .stack[data-left="3"]::before { opacity: 0.55; }
+  .stack[data-left="2"]::after, .stack[data-left="3"]::after { opacity: 0.85; }
+  .card { position: relative; z-index: 1; padding: 12px 14px 12px; background: var(--card); }
+  .card.in   { animation: cardIn 0.36s var(--spring); }
+  .card.out-accept { animation: outUp 0.22s ease-in forwards; }
+  .card.out-ignore { animation: outLeft 0.22s ease-in forwards; }
+  @keyframes cardIn  { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
+  @keyframes outUp   { to { opacity: 0; transform: translateY(-14px) scale(0.98); } }
+  @keyframes outLeft { to { opacity: 0; transform: translateX(-26px); } }
+
+  .kind { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: var(--k); }
+  .kind i { width: 7px; height: 7px; border-radius: 50%; background: var(--k); }
+  .kind .count { margin-left: auto; font-weight: 500; color: var(--tertiary); font-variant-numeric: tabular-nums; }
+  [data-kind="spelling"], [data-kind="accent"], [data-kind="case"], [data-kind="grammar"] { --k: var(--red); }
+  [data-kind="punctuation"] { --k: var(--orange); }
+  [data-kind="rewrite"]     { --k: var(--blue); }
+
+  .swap { margin: 9px 0 6px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 9px; }
+  .swap .from {
+    font-size: 15px; color: var(--secondary);
+    text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--k) 70%, transparent);
+    text-decoration-thickness: 1.5px;
+  }
+  .swap .arrow { color: var(--tertiary); font-size: 13px; }
+  .swap .to { font-family: var(--round); font-size: 19px; font-weight: 600; letter-spacing: -0.01em; color: var(--accent); }
+  .swap .verb { font-size: 12px; color: var(--secondary); }
+  .ctx { font-size: 12px; color: var(--secondary); line-height: 1.45; word-break: break-word; }
+  .ctx mark { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--label); border-radius: 4px; padding: 0 2px; }
+
+  .actions { display: flex; gap: 8px; margin-top: 12px; }
+  .btn {
+    height: 28px; padding: 0 12px; border-radius: 7px; font-size: 12.5px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px; transition: transform 0.08s, filter 0.15s, background 0.15s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary { background: var(--accent); color: white; box-shadow: 0 1px 2px color-mix(in srgb, var(--accent) 35%, transparent), inset 0 0.5px 0 rgba(255,255,255,0.25); }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.plain { background: var(--fill); color: var(--label); }
+  .btn.plain:hover { background: var(--fill-2); }
+  .btn .key { font-size: 11px; opacity: 0.7; font-weight: 500; }
+  .btn.grow { flex: 1; justify-content: center; }
+
+  /* Document */
+  .doc { padding: 4px; }
+  .doc .scroll {
+    max-height: 240px; overflow-y: auto; padding: 10px 12px; font-size: 13px; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text;
+  }
+  .doc .scroll::-webkit-scrollbar { width: 6px; }
+  .doc .scroll::-webkit-scrollbar-thumb { background: var(--fill-2); border-radius: 3px; }
+  .chg {
+    border-radius: 4px; padding: 0 1px; cursor: pointer; transition: background 0.18s, color 0.18s;
+    background: color-mix(in srgb, var(--k) 13%, transparent);
+    box-shadow: inset 0 -1.5px 0 color-mix(in srgb, var(--k) 75%, transparent);
+  }
+  .chg:hover { background: color-mix(in srgb, var(--k) 22%, transparent); }
+  .chg.off {
+    background: transparent; box-shadow: none; color: var(--secondary);
+    text-decoration: underline dotted var(--tertiary); text-underline-offset: 3px;
+  }
+  .chg.del { text-decoration: line-through; text-decoration-color: var(--k); color: var(--secondary); }
+  .chg.gap::after { content: "＋"; font-size: 10px; color: var(--tertiary); }
+  .legend { display: flex; gap: 14px; white-space: nowrap; padding: 8px 12px 6px; border-top: 0.5px solid var(--separator); font-size: 11px; color: var(--secondary); }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .legend i { width: 6px; height: 6px; border-radius: 50%; background: var(--k); }
+
+  /* Rewrite (Pro / Perso): one suggestion for the whole text */
+  .rw { padding: 12px 14px 10px; }
+  .rw .head { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: var(--accent); }
+  .rw .head i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .rw .head .cmp { margin-left: auto; font-weight: 500; color: var(--secondary); padding: 2px 8px; border-radius: 6px; }
+  .rw .head .cmp:hover, .rw .head .cmp.on { background: var(--fill); color: var(--label); }
+  .rw .body {
+    margin-top: 8px; max-height: 240px; overflow-y: auto; font-size: 13.5px; line-height: 1.55;
+    white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text;
+  }
+  .rw .body ins { text-decoration: none; background: color-mix(in srgb, var(--accent) 13%, transparent); border-radius: 3px; }
+  .rw .body del { margin-right: 3px; color: var(--secondary); text-decoration-color: color-mix(in srgb, var(--red) 65%, transparent); }
+
+  /* Result states (none / done / error / empty) */
+  .state { padding: 18px 16px 16px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; }
+  .state h2 { font-size: 14px; font-weight: 600; margin-top: 8px; letter-spacing: -0.01em; }
+  .state p  { font-size: 12px; color: var(--secondary); max-width: 300px; word-break: break-word; }
+  .state .btn { margin-top: 10px; }
+  .badge { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; }
+  .badge svg { width: 24px; height: 24px; }
+  .badge.green  { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+  .badge.orange { background: color-mix(in srgb, var(--orange) 16%, transparent); color: var(--orange); }
+  .badge.gray   { background: var(--fill); color: var(--secondary); }
+  .check path { stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw 0.45s 0.12s var(--spring) forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .badge.pop { animation: pop 0.45s var(--spring); }
+  @keyframes pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.06); } 100% { transform: scale(1); opacity: 1; } }
+
+  /* ── Footer ─────────────────────────────────────────────────────────────── */
+  .foot { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--tertiary); min-height: 16px; }
+  .foot .link { color: var(--accent); font-weight: 600; font-size: 11.5px; }
+  .foot .link:hover { text-decoration: underline; }
+  .foot .right { margin-left: auto; }
+  kbd { font: 500 10.5px var(--font); color: var(--secondary); background: var(--fill); border-radius: 4px; padding: 1px 5px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
 </style>
 </head>
-<body data-mode="pro" data-expanded="false">
+<body data-mode="casual">
+<div id="root">
 
-<!-- Pip + mode name -->
-<div class="mascot-row">
-  <div class="pip-wrap expand-only" data-mode="pro" id="pipWrap">
-    <svg viewBox="0 0 32 32" id="pipSvg" data-hat="pro"></svg>
+  <header class="hdr">
+    <div class="glyph" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12.5 L10.8 4.7 a1.5 1.5 0 0 1 2.1 2.1 L5.1 14.6 L2.4 15.1 Z"/>
+        <path d="M11.8 1.4 l0.5 1.1 1.1 0.5 -1.1 0.5 -0.5 1.1 -0.5 -1.1 -1.1 -0.5 1.1 -0.5 Z" fill="white" stroke-width="0.6"/>
+      </svg>
+    </div>
+    <div class="title"><b>TextPolish</b><span id="src">Avec Gemini</span></div>
+    <div class="pill" id="pill"></div>
+  </header>
+
+  <nav class="seg" role="tablist" aria-label="Mode">
+    <div class="knob"></div>
+    <button data-mode="casual" role="tab" onclick="chooseMode('casual')">Correction</button>
+    <button data-mode="pro"    role="tab" onclick="chooseMode('pro')">Pro</button>
+    <button data-mode="custom" role="tab" onclick="chooseMode('custom')">Perso</button>
+  </nav>
+  <div class="hint" id="modeHint"><i></i><span id="modeHintTxt"></span></div>
+
+  <div class="instr" id="instr">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 2v2.2M8 11.8V14M2 8h2.2M11.8 8H14M3.8 3.8l1.5 1.5M10.7 10.7l1.5 1.5M3.8 12.2l1.5-1.5M10.7 5.3l1.5-1.5"/></svg>
+    <input id="instrInput" type="text" placeholder="Ex. : traduire en anglais, plus court…" autocomplete="off">
+    <button class="go" onclick="submitCustom()">Réécrire</button>
   </div>
-  <div class="mode-block">
-    <div class="mode-name"><span class="accent-dot"></span><span id="modeLbl">Professionnel</span></div>
-    <span class="kbd">⌘↵</span>
+  <div class="presets" id="presets">
+    <button onclick="preset('Traduis en anglais')">Anglais</button>
+    <button onclick="preset('Rends le texte plus court')">Plus court</button>
+    <button onclick="preset('Rends le ton plus chaleureux et amical')">Plus chaleureux</button>
+    <button onclick="preset('Rends le texte plus drôle, sans changer le sens')">Plus drôle</button>
   </div>
-  <button class="expand-toggle" id="expandToggle" onclick="toggleExpand()" title="Plus d'options">⌄</button>
+
+  <main id="stage">
+    <section class="view surface reading" id="vReading">
+      <div class="txt" id="readTxt"></div>
+      <div class="bar"><i></i></div>
+    </section>
+
+    <section class="view" id="vCards"><div class="stack" id="stack"></div></section>
+
+    <section class="view surface doc" id="vDoc">
+      <div class="scroll" id="docText"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section class="view card surface rw" id="vRewrite">
+      <div class="head"><i></i><span id="rwTitle">Réécriture</span><button class="cmp" id="rwCmp" onclick="toggleCompare()">Comparer</button></div>
+      <div class="body" id="rwBody"></div>
+    </section>
+
+    <section class="view surface state" id="vState"></section>
+  </main>
+
+  <footer class="foot" id="foot"></footer>
 </div>
-
-<!-- Input text -->
-<div class="lbl expand-only"><span>Texte sélectionné</span><span class="hint" id="srcHint">—</span></div>
-<div class="box expand-only" id="inputBox">En attente du texte…</div>
-
-<!-- Instruction (custom only) -->
-<div class="instr-row" id="instrRow">
-  <div class="lbl"><span>Instruction</span><span class="hint">votre requête</span></div>
-  <div class="instr">
-    <span class="i-icon">/</span>
-    <input id="instrInput" type="text" placeholder="ex : traduire en anglais, ton neutre" />
-  </div>
-</div>
-
-<!-- Output -->
-<div class="lbl"><span>Réécriture</span><span class="hint" id="outHint">—</span></div>
-<div class="box out" id="outputBox">
-  <span class="status" id="statusSpan">En attente…</span>
-  <span id="outContent" style="display:none"></span>
-  <span class="cursor hidden" id="cursorEl"></span>
-</div>
-
-<!-- Copy button -->
-<button class="copy-btn" id="copyBtn" onclick="copyOutput()">copier ↗</button>
-
-<!-- Accept / Revise (shown once a correction is ready) -->
-<div class="review-row" id="reviewRow">
-  <button class="btn-accept" onclick="acceptResult()">Accepter</button>
-  <button class="btn-revise" onclick="reviseResult()">✦ Réviser avec l'IA</button>
-</div>
-
-<!-- Mode chips -->
-<div class="chips">
-  <button class="chip active" data-mode="pro"    onclick="chipClick('pro')">Pro</button>
-  <button class="chip"        data-mode="casual" onclick="chipClick('casual')">Décontracté</button>
-  <button class="chip"        data-mode="custom" onclick="chipClick('custom')">Perso</button>
-</div>
-
-<!-- Repolir button -->
-<button class="btn expand-only" id="repolirBtn" onclick="startPolish()">
-  <span>✦</span><span>Repolir</span><span class="sub">⌘↵</span>
-</button>
-
-<!-- History bar + drawer -->
-<div class="hist expand-only">
-  <div class="hist-left">
-    <span class="pill" onclick="toggleDrawer()">HISTORIQUE</span>
-    <span id="histLbl">0 sur 10</span>
-  </div>
-  <div class="dots" id="histDots"></div>
-</div>
-<div class="hist-drawer expand-only" id="histDrawer"></div>
 
 <script>
-// ── Pip mascot (data-driven SVG) ──────────────────────────────────────────
-const SVG_NS = "http://www.w3.org/2000/svg";
-const BODY = [
-  [10, 7,12, 1,"$pb"],[9, 8,14,17,"$pb"],[10,25,12, 1,"$pb"],
-  [11,26,10, 1,"$pb"],[12,27, 8, 1,"$pb"],
-  [13,28, 6, 1,"#7d8794"],[14,29, 4, 1,"#5d6773"],[15,30, 2, 1,"#3f4651"],
-  [21, 8, 2,17,"$pb2"],[20,25, 2, 1,"$pb2"],[19,26, 2, 1,"$pb2"],[18,27, 2, 1,"$pb2"],
-  [ 9, 9, 1,15,"$pb3"],
-  [ 9,21,14, 1,"$pb4"],[ 9,22,14, 1,"$pb5"],
-  [10, 9,12,12,"#c9cdd4"],[21, 9, 1,12,"#9ea4ae"],[10,20,12, 1,"#9ea4ae"],
-  [10, 9,11, 1,"#dcdfe4"],[10,10, 1,10,"#d4d8df"],
-  [12,11, 3, 1,"#8a8f98"],[17,11, 3, 1,"#8a8f98"],
-  [12,12, 3, 3,"#0a1422"],[17,12, 3, 3,"#0a1422"],
-  [12,12, 1, 1,"#ffffff"],[17,12, 1, 1,"#ffffff"],
-  [14,14, 1, 1,"#5a6a7e"],[19,14, 1, 1,"#5a6a7e"],
-  [14,18, 4, 1,"#0a1422"],
-  [13,17, 1, 1,"#0a1422"],[18,17, 1, 1,"#0a1422"],
-  [12,16, 1, 1,"#0a1422"],[19,16, 1, 1,"#0a1422"],
-  [11,15, 1, 1,"#b5b9c1"],[20,15, 1, 1,"#b5b9c1"],
-];
-const HATS = {
-  pro:[
-    [10, 7,12, 1,"#0a1422"],[ 8, 5,16, 2,"#162a47"],[ 9, 4,14, 1,"#162a47"],
-    [10, 3,12, 1,"#162a47"],[12, 2, 8, 1,"#162a47"],
-    [23, 5, 2, 2,"#1f3a5f"],[24, 4, 1, 2,"#1f3a5f"],
-    [11, 3, 3, 1,"#2a4973"],[12, 4, 4, 1,"#223e64"],[13, 5, 3, 1,"#2a4973"],
-    [15, 1, 2, 1,"#0a1422"],
-    [15,19, 2, 1,"#0a1422"],[14,20, 4, 1,"#0a1422"],
-    [15,21, 2, 2,"#0a1422"],[15,21, 2, 1,"#13233a"],[16,21, 1, 1,"#0a1422"],
-  ],
-  casual:[
-    [10, 6,12, 2,"#162a47"],[10, 5,12, 1,"#1a3052"],[11, 4,10, 1,"#1f3a5f"],
-    [12, 3, 8, 1,"#1f3a5f"],[13, 2, 6, 1,"#1f3a5f"],[16, 2, 1, 4,"#2a4973"],
-    [18, 7,10, 1,"#13233a"],[19, 8, 9, 1,"#0a1422"],[21, 9, 5, 1,"#0a1422"],
-    [23, 8, 2, 1,"#c9cdd4"],[15, 5, 2, 1,"#6a9e7f"],[16, 4, 1, 1,"#8cbb9e"],
-    [15, 1, 2, 1,"#0a1422"],
-  ],
-  custom:[
-    [ 7, 7,18, 1,"#3a2f6b"],[ 8, 8,16, 1,"#2b2352"],
-    [ 9, 6,14, 1,"#4a3f80"],[10, 5,12, 1,"#4a3f80"],[11, 4,10, 1,"#4a3f80"],
-    [12, 3, 8, 1,"#4a3f80"],[13, 2, 6, 1,"#4a3f80"],[14, 1, 4, 1,"#4a3f80"],
-    [15, 0, 2, 1,"#4a3f80"],
-    [19, 5, 3, 1,"#33295e"],[18, 4, 3, 1,"#33295e"],[17, 3, 3, 1,"#33295e"],
-    [16, 2, 3, 1,"#33295e"],[16, 1, 2, 1,"#33295e"],
-    [11, 5, 1, 1,"#6159a0"],[12, 4, 1, 1,"#6159a0"],[13, 3, 1, 1,"#6159a0"],[14, 2, 1, 1,"#6159a0"],
-    [14, 5, 3, 1,"#e8c25a"],[15, 4, 1, 3,"#e8c25a"],[15, 5, 1, 1,"#fff2b8"],[18, 3, 1, 1,"#fff2b8"],
-  ],
+// ── Environment ─────────────────────────────────────────────────────────────
+const IN_APP = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.bridge);
+if (!IN_APP) document.documentElement.classList.add("no-vibrancy");
+{ const t = new URLSearchParams(location.search).get("theme"); if (t) document.documentElement.dataset.theme = t; }
+function send(msg) { if (IN_APP) window.webkit.messageHandlers.bridge.postMessage(msg); else (window.__sent = window.__sent || []).push(msg); }
+
+const $ = id => document.getElementById(id);
+const ICON = {
+  check: '<svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  warn:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 L21.5 20 H2.5 Z"/><path d="M12 10v4.5M12 17.4v.1"/></svg>',
+  cursor:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 4h6M9 20h6M12 4v16"/></svg>',
 };
-function fillTok(t) { return (t && t[0] === '$') ? 'var(--' + t.slice(1) + ')' : t; }
-function mkRect(d) {
-  const r = document.createElementNS(SVG_NS, "rect");
-  r.setAttribute("x",d[0]); r.setAttribute("y",d[1]);
-  r.setAttribute("width",d[2]); r.setAttribute("height",d[3]);
-  r.setAttribute("fill", fillTok(d[4]));
-  return r;
-}
-function renderPip(svg) {
-  while (svg.firstChild) svg.removeChild(svg.firstChild);
-  BODY.forEach(d => svg.appendChild(mkRect(d)));
-  (HATS[svg.getAttribute("data-hat")] || []).forEach(d => svg.appendChild(mkRect(d)));
-}
-renderPip(document.getElementById("pipSvg"));
+const KIND_ORDER = ["spelling", "accent", "case", "punctuation", "rewrite"];
+const KIND_GROUP = { spelling: "Orthographe", accent: "Orthographe", case: "Orthographe", grammar: "Grammaire", punctuation: "Ponctuation", rewrite: "Style" };
 
 // ── State ───────────────────────────────────────────────────────────────────
-let currentMode = "pro";
+let mode = "casual";
 let busy = false;
-let expanded = false;
-const MODE_LABELS = { pro:"Professionnel", casual:"Décontracté", custom:"Personnalisé" };
+let parts = [];          // [{op:"equal",text} | {op:"change",id,before,after,kind,label,context_before,context_after}]
+let changes = [];
+let layout = "none";
+let cursor = 0;          // current card
+let accepted = new Set();
+let closeTimer = null;
 
-function send(msg) {
-  window.webkit.messageHandlers.bridge.postMessage(msg);
+// ── Layout helpers ──────────────────────────────────────────────────────────
+function show(viewId) {
+  ["vReading", "vCards", "vDoc", "vRewrite", "vState"].forEach(v => $(v).classList.toggle("on", v === viewId));
+}
+function setPill(text, tone, spinning) {
+  const p = $("pill");
+  p.dataset.tone = tone || "";
+  p.innerHTML = (spinning ? '<span class="spin"></span>' : "") + esc(text);
+  p.style.visibility = text ? "visible" : "hidden";
+}
+function setFoot(html) { $("foot").innerHTML = html; }
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function plural(n, one, many) { return n + " " + (n > 1 ? many : one); }
+
+// Report our natural height so the native panel can hug the content.
+let lastH = 0;
+function reportHeight() {
+  const h = Math.ceil($("root").getBoundingClientRect().height);
+  if (h && Math.abs(h - lastH) > 1) { lastH = h; send({ type: "resize", height: h }); }
+}
+new ResizeObserver(reportHeight).observe($("root"));
+
+// ── Modes ───────────────────────────────────────────────────────────────────
+const MODE_HINT = {
+  casual: "Corrige les fautes sans toucher à ta façon d'écrire",
+  pro:    "Réécrit le texte dans un ton professionnel",
+  custom: "Applique ta consigne : traduire, raccourcir, changer le ton…",
+};
+function applyMode(m) {
+  mode = m;
+  document.body.dataset.mode = m;
+  document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
+  $("modeHintTxt").textContent = MODE_HINT[m];
+}
+function chooseMode(m) {
+  if (layout === "empty") { applyMode(m); return; }        // nothing selected: nothing to run
+  if (m === mode && m !== "custom" && busy) return;        // same mode already running
+  clearTimeout(closeTimer);
+  applyMode(m);
+  if (m === "custom") { showIdle(); setTimeout(() => $("instrInput").focus(), 30); return; }
+  // A newer request supersedes the running one (Python drops stale results).
+  send({ type: "polish", mode: m });
+}
+function showIdle() {
+  busy = false; layout = "idle";
+  $("vReading").classList.add("idle");
+  show("vReading");
+  setPill("", "");
+  setFoot(`<span>Choisis une idée ou écris ta consigne</span><span class="right"><kbd>↵</kbd> lancer</span>`);
+}
+function preset(text) { $("instrInput").value = text; submitCustom(); }
+function submitCustom() {
+  const v = $("instrInput").value.trim();
+  if (!v) { $("instrInput").focus(); return; }
+  send({ type: "polish", mode: "custom", instruction: v });
 }
 
-// ── Compact / expanded ────────────────────────────────────────────────────
-function setExpanded(value) {
-  expanded = value;
-  document.body.setAttribute("data-expanded", value ? "true" : "false");
-  send({ type: "expand", value });
+// ── Cards ───────────────────────────────────────────────────────────────────
+function swapHTML(c) {
+  const from = c.before.trim(), to = c.after.trim();
+  if (!from) return `<span class="verb">Ajouter</span><span class="to">${esc(to)}</span>`;
+  if (!to)   return `<span class="verb">Supprimer</span><span class="from">${esc(from)}</span>`;
+  return `<span class="from">${esc(from)}</span><span class="arrow">→</span><span class="to">${esc(to)}</span>`;
+}
+function ctxHTML(c) {
+  const shown = c.after.trim() || c.before.trim();
+  return `${esc(c.context_before)} <mark>${esc(shown)}</mark> ${esc(c.context_after)}`.trim();
+}
+function renderCard(animate) {
+  const stack = $("stack");
+  const left = changes.length - cursor;
+  stack.dataset.left = Math.min(left, 3);
+  const c = changes[cursor];
+  stack.innerHTML = `
+    <article class="card surface ${animate ? "in" : ""}" data-kind="${c.kind}">
+      <div class="kind"><i></i>${esc(c.label)}<span class="count">${cursor + 1} sur ${changes.length}</span></div>
+      <div class="swap">${swapHTML(c)}</div>
+      ${(c.context_before || c.context_after) ? `<div class="ctx">${ctxHTML(c)}</div>` : ""}
+      <div class="actions">
+        <button class="btn primary" onclick="decide(true)">Accepter <span class="key">↵</span></button>
+        <button class="btn plain" onclick="decide(false)">Ignorer</button>
+      </div>
+    </article>`;
+  setPill(plural(changes.length, "correction", "corrections"), "accent");
+  setFoot(changes.length - cursor > 1
+    ? `<button class="link" onclick="acceptAll()">Tout accepter</button><kbd>⌘↵</kbd><span class="right"><kbd>⇥</kbd> ignorer · <kbd>esc</kbd> fermer</span>`
+    : `<span><kbd>⇥</kbd> ignorer</span><span class="right"><kbd>esc</kbd> fermer</span>`);
+}
+function decide(ok) {
+
+  if (layout !== "cards" || cursor >= changes.length) return;
+  if (ok) accepted.add(changes[cursor].id);
+  const card = $("stack").querySelector(".card");
+  card.classList.remove("in");
+  card.classList.add(ok ? "out-accept" : "out-ignore");
+  setTimeout(() => {
+    cursor += 1;
+    if (cursor < changes.length) renderCard(true); else finish();
+  }, 190);
+}
+function acceptAll() {
+  changes.forEach(c => accepted.add(c.id));
+  finish();
 }
 
-function toggleExpand() {
-  setExpanded(!expanded);
+// ── Document ────────────────────────────────────────────────────────────────
+function renderDoc() {
+  const el = $("docText");
+  el.innerHTML = "";
+  parts.forEach(p => {
+    if (p.op === "equal") { el.appendChild(document.createTextNode(p.text)); return; }
+    const s = document.createElement("span");
+    s.className = "chg";
+    s.dataset.kind = p.kind;
+    s.title = p.label + (p.before.trim() ? " — avant : « " + p.before.trim() + " »" : "");
+    s.onclick = () => toggleChange(p, s);
+    paintChange(p, s);
+    el.appendChild(s);
+  });
+  const counts = {};
+  changes.forEach(c => { const g = KIND_GROUP[c.kind]; counts[g] = (counts[g] || 0) + 1; });
+  const kindOf = { Orthographe: "spelling", Grammaire: "grammar", Ponctuation: "punctuation", Style: "rewrite" };
+  $("legend").innerHTML = Object.entries(counts)
+    .map(([g, n]) => `<span data-kind="${kindOf[g]}"><i></i>${g} ${n}</span>`).join("")
+    ;
+  updateDocChrome();
+}
+function paintChange(p, s) {
+  const on = accepted.has(p.id);
+  const removal = !p.after.trim();
+  s.classList.toggle("off", !on);
+  s.classList.toggle("del", on && removal);
+  s.classList.toggle("gap", !on && !p.before.trim());
+  s.textContent = on ? (removal ? p.before : p.after) : (p.before.trim() ? p.before : "");
+}
+function toggleChange(p, s) {
+  if (accepted.has(p.id)) accepted.delete(p.id); else accepted.add(p.id);
+  paintChange(p, s);
+  updateDocChrome();
+}
+function updateDocChrome() {
+  const n = accepted.size;
+  setPill(plural(changes.length, "correction", "corrections"), "accent");
+  setFoot(`<span>${n === changes.length ? "Clique une correction pour l'ignorer" : plural(n, "retenue", "retenues") + " sur " + changes.length}</span>
+    <span class="right"></span>
+    <button class="btn primary" onclick="finish()">${n ? "Appliquer" : "Fermer"} <span class="key">⌘↵</span></button>`);
 }
 
-// ── Mode ────────────────────────────────────────────────────────────────────
-function _applyMode(mode) {
-  currentMode = mode;
-  document.body.setAttribute("data-mode", mode);
-  document.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", c.dataset.mode === mode));
-  const pip = document.getElementById("pipWrap");
-  pip.setAttribute("data-mode", mode);
-  const svg = document.getElementById("pipSvg");
-  svg.setAttribute("data-hat", mode);
-  renderPip(svg);
-  document.getElementById("modeLbl").textContent  = MODE_LABELS[mode];
-  document.getElementById("instrRow").classList.toggle("show", mode === "custom");
+// ── Rewrite ─────────────────────────────────────────────────────────────────
+let comparing = false;
+function renderRewrite() {
+  const el = $("rwBody");
+  el.innerHTML = "";
+  parts.forEach(p => {
+    if (p.op === "equal") { el.appendChild(document.createTextNode(p.text)); return; }
+    if (comparing && p.before) { const d = document.createElement("del"); d.textContent = p.before; el.appendChild(d); }
+    if (p.after) {
+      if (comparing) { const i = document.createElement("ins"); i.textContent = p.after; el.appendChild(i); }
+      else el.appendChild(document.createTextNode(p.after));
+    }
+  });
+  $("rwCmp").classList.toggle("on", comparing);
+  $("rwCmp").textContent = comparing ? "Masquer" : "Comparer";
+  $("rwTitle").textContent = mode === "custom" ? "Selon ton instruction" : "Version professionnelle";
+  setPill("Prêt", "accent");
+  setFoot(`<button class="btn plain" onclick="send({type:'close'})">Annuler</button><span class="right"></span>
+    <button class="btn primary" onclick="acceptAll()">Remplacer <span class="key">⌘↵</span></button>`);
 }
+function toggleCompare() { comparing = !comparing; renderRewrite(); }
 
-function chipClick(mode) {
-  if (mode === "custom") {
-    setExpanded(true);
-    _applyMode(mode);
-    document.getElementById("instrInput").focus();
+// ── Finish / states ─────────────────────────────────────────────────────────
+function stateView(badgeClass, icon, title, text, extra) {
+  $("vState").innerHTML = `<div class="badge ${badgeClass} pop">${icon}</div><h2>${esc(title)}</h2>${text ? `<p>${esc(text)}</p>` : ""}${extra || ""}`;
+  show("vState");
+}
+function finish() {
+  const n = accepted.size;
+  layout = "done";
+  if (!n) {
+    stateView("gray", ICON.check, "Aucune modification", "Ton texte reste tel quel.");
+    setPill("", ""); setFoot("");
+    closeTimer = setTimeout(() => send({ type: "close" }), 900);
     return;
   }
-  _applyMode(mode);
-  if (!busy) {
-    send({ type: "polish", mode });
-  }
-}
-
-// ── Polish ──────────────────────────────────────────────────────────────────
-function startPolish() {
-  if (busy) return;
-  if (currentMode === "custom") {
-    const instr = document.getElementById("instrInput").value.trim();
-    if (!instr) { document.getElementById("instrInput").focus(); return; }
-    send({ type:"polish", mode:"custom", instruction:instr });
-  } else {
-    send({ type:"polish", mode:currentMode });
-  }
-}
-
-// ── History drawer ──────────────────────────────────────────────────────────
-function toggleDrawer() {
-  document.getElementById("histDrawer").classList.toggle("open");
-}
-
-// ── Copy ────────────────────────────────────────────────────────────────────
-function copyOutput() {
-  const text = document.getElementById("outContent").textContent;
-  if (!text) return;
-  navigator.clipboard.writeText(text).catch(() => {});
-  const btn = document.getElementById("copyBtn");
-  btn.textContent = "copié ✓";
-  setTimeout(() => { btn.textContent = "copier ↗"; }, 1500);
-}
-
-// ── Review (accept / revise) ─────────────────────────────────────────────────
-function acceptResult() {
-  send({ type: "accept" });
-}
-
-function reviseResult() {
-  setExpanded(true);
-  _applyMode("custom");
-  document.getElementById("instrInput").focus();
-}
-
-// ── App interface (called by Python via evaluateJavaScript) ─────────────────
-window.App = {
-
-  setInputText(text) {
-    document.getElementById("inputBox").textContent = text;
-  },
-
-  setMode(mode) {
-    _applyMode(mode);
-  },
-
-  setSourceApp(name) {
-    document.getElementById("srcHint").textContent = name ? "depuis " + name : "—";
-  },
-
-  onPolishStart() {
-    busy = true;
-    document.getElementById("repolirBtn").disabled = true;
-    document.getElementById("outContent").style.display  = "none";
-    document.getElementById("cursorEl").classList.add("hidden");
-    document.getElementById("reviewRow").classList.remove("show");
-    const s = document.getElementById("statusSpan");
-    s.textContent = "Préparation…"; s.style.color = "#9da8b5"; s.style.display = "inline";
-    document.getElementById("outHint").textContent = "—";
-  },
-
-  setStatus(msg) {
-    const s = document.getElementById("statusSpan");
-    s.textContent = msg; s.style.color = "#9da8b5"; s.style.display = "inline";
-  },
-
-  startStream() {
-    document.getElementById("outContent").textContent = "";
-    document.getElementById("outContent").style.display = "inline";
-    document.getElementById("statusSpan").style.display = "none";
-    document.getElementById("cursorEl").classList.remove("hidden");
-    document.getElementById("outHint").textContent = "en cours…";
-  },
-
-  appendToken(tok) {
-    document.getElementById("outContent").textContent += tok;
-  },
-
-  onDone() {
-    busy = false;
-    document.getElementById("cursorEl").classList.add("hidden");
-    document.getElementById("repolirBtn").disabled = false;
-    document.getElementById("outHint").textContent = "Gemini";
-    document.getElementById("copyBtn").classList.add("visible");
-  },
-
-  setDiff(segments) {
-    const el = document.getElementById("outContent");
-    el.innerHTML = "";
-    segments.forEach(seg => {
-      if (seg.op === "equal") {
-        el.appendChild(document.createTextNode(seg.text));
-      } else if (seg.op === "delete") {
-        const d = document.createElement("del");
-        d.className = "diff-del";
-        d.textContent = seg.text;
-        el.appendChild(d);
-      } else if (seg.op === "insert") {
-        const i = document.createElement("ins");
-        i.className = "diff-ins";
-        i.textContent = seg.text;
-        el.appendChild(i);
-      }
-    });
-    el.style.display = "inline";
-    document.getElementById("reviewRow").classList.add("show");
-  },
-
-  onError(msg) {
-    busy = false;
-    document.getElementById("copyBtn").classList.remove("visible");
-    document.getElementById("cursorEl").classList.add("hidden");
-    document.getElementById("outContent").style.display = "none";
-    document.getElementById("reviewRow").classList.remove("show");
-    const s = document.getElementById("statusSpan");
-    s.textContent = msg; s.style.color = "#b94040"; s.style.display = "inline";
-    document.getElementById("repolirBtn").disabled = false;
-    document.getElementById("outHint").textContent = "erreur";
-  },
-
-  updateHistory(items) {
-    const n = items.length;
-    document.getElementById("histLbl").textContent = n + " sur 10" + (n > 0 ? " · ↵ pour coller" : "");
-    const dots = document.getElementById("histDots");
-    dots.innerHTML = "";
-    for (let i = 0; i < 6; i++) {
-      const d = document.createElement("i");
-      if (i === n - 1 && n > 0) d.classList.add("current");
-      else if (i < n) d.classList.add("filled");
-      dots.appendChild(d);
-    }
-    const drawer = document.getElementById("histDrawer");
-    drawer.innerHTML = "";
-    items.forEach((item, i) => {
-      const el = document.createElement("div");
-      el.className = "hist-item";
-      el.innerHTML = `<span class="hist-num">${String(i+1).padStart(2,"0")}</span>`
-                   + `<span class="hist-txt">${esc(item.preview)}</span>`;
-      el.onclick = () => {
-        document.getElementById("outContent").textContent = item.corrected;
-        document.getElementById("outContent").style.display = "inline";
-        document.getElementById("statusSpan").style.display = "none";
-        document.getElementById("cursorEl").classList.add("hidden");
-        document.getElementById("reviewRow").classList.remove("show");
-        drawer.classList.remove("open");
-      };
-      drawer.appendChild(el);
-    });
-  },
-
-  reset() {
-    busy = false;
-    expanded = false;
-    document.body.setAttribute("data-expanded", "false");
-    document.getElementById("srcHint").textContent         = "—";
-    document.getElementById("copyBtn").classList.remove("visible");
-    document.getElementById("copyBtn").textContent         = "copier ↗";
-    document.getElementById("inputBox").textContent        = "En attente du texte…";
-    document.getElementById("outContent").textContent      = "";
-    document.getElementById("outContent").style.display    = "none";
-    document.getElementById("histDrawer").classList.remove("open");
-    document.getElementById("cursorEl").classList.add("hidden");
-    document.getElementById("reviewRow").classList.remove("show");
-    document.getElementById("repolirBtn").disabled          = false;
-    document.getElementById("instrInput").value             = "";
-    document.getElementById("outHint").textContent          = "—";
-    const s = document.getElementById("statusSpan");
-    s.textContent = "En attente…"; s.style.color = "#9da8b5"; s.style.display = "inline";
-  },
-};
-
-function esc(s) {
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  stateView("green", ICON.check, n === changes.length ? "Corrigé" : plural(n, "correction appliquée", "corrections appliquées"), "Collé dans ton texte.");
+  setPill("", ""); setFoot("");
+  setTimeout(() => send({ type: "accept", accepted: [...accepted] }), 420);
 }
 
 // ── Keyboard ────────────────────────────────────────────────────────────────
 document.addEventListener("keydown", e => {
-  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); startPolish(); }
-  if (e.key === "Escape") send({ type:"close" });
+  const typing = document.activeElement === $("instrInput");
+  if (e.key === "Escape") { e.preventDefault(); send({ type: "close" }); return; }
+  const ready = layout === "cards" || layout === "rewrite" || layout === "document";
+  // ⌘↵ always means "replace my text", even with the cursor still in the
+  // Perso field; plain ↵ there (re)runs the instruction.
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && (ready || !typing)) {
+    e.preventDefault();
+    if (layout === "cards" || layout === "rewrite") acceptAll(); else if (layout === "document") finish();
+    return;
+  }
+  if (typing) { if (e.key === "Enter") { e.preventDefault(); submitCustom(); } return; }
+  // e.code is the physical key: on AZERTY, ⌘2 has e.key === "é".
+  const digit = { Digit1: 0, Digit2: 1, Digit3: 2 }[e.code];
+  if (e.metaKey && digit !== undefined) { e.preventDefault(); chooseMode(["casual", "pro", "custom"][digit]); return; }
+  if (layout === "cards") {
+    if (e.key === "Enter") { e.preventDefault(); decide(true); }
+    else if (e.key === "Tab" || e.key === "Backspace" || e.key === "ArrowRight") { e.preventDefault(); decide(false); }
+  } else if (layout === "document" && e.key === "Enter") { e.preventDefault(); finish(); }
+  else if (layout === "rewrite" && e.key === "Enter") { e.preventDefault(); acceptAll(); }
 });
+
+// ── App interface (called from Python via evaluateJavaScript) ───────────────
+window.App = {
+  reset() {
+    clearTimeout(closeTimer);
+    busy = false; parts = []; changes = []; layout = "none"; cursor = 0; accepted = new Set();
+    $("instrInput").value = "";
+    $("readTxt").textContent = "";
+    setPill("", ""); setFoot("");
+    show(null);
+  },
+  setSourceApp(name) { $("src").textContent = name ? "Dans " + name : "Avec Gemini"; },
+  setMode(m) { applyMode(m); },
+  setInputText(text) { $("readTxt").textContent = text; },
+  setShortcut(label) { window.__shortcut = label; },
+  noSelection() {
+    layout = "empty";
+    stateView("gray", ICON.cursor, "Aucun texte sélectionné",
+      "Sélectionne une phrase dans n'importe quelle app, puis relance TextPolish" + (window.__shortcut ? " (" + window.__shortcut + ")." : "."));
+    setPill("", ""); setFoot(`<span class="right"><kbd>esc</kbd> fermer</span>`);
+  },
+  onPolishStart() {
+    busy = true; layout = "reading";
+    $("vReading").classList.remove("idle");
+    show("vReading");
+    setPill(mode === "casual" ? "Lecture" : "Réécriture", "", true);
+    setFoot(`<span>Envoyé à Gemini (Google) pour la correction</span><span class="right"><kbd>esc</kbd> fermer</span>`);
+  },
+  setStatus() {},
+  startStream() { setPill("Correction", "", true); },
+  appendToken() {},
+  onDone() { busy = false; },
+  setChanges(newParts, newLayout) {
+    busy = false;
+    parts = newParts;
+    changes = parts.filter(p => p.op === "change");
+    layout = newLayout; cursor = 0;
+    accepted = new Set(newLayout === "document" ? changes.map(c => c.id) : []);
+    if (newLayout === "none" && mode === "casual") {
+      // No auto-close: the next step is often "make it more formal" or "translate it".
+      stateView("green", ICON.check, "Aucune faute", "Ton texte est déjà correct. Tu peux aussi le réécrire :",
+        `<div class="actions" style="justify-content:center">
+           <button class="btn plain" onclick="chooseMode('pro')">Version pro <span class="key">⌘2</span></button>
+           <button class="btn plain" onclick="chooseMode('custom')">Personnaliser <span class="key">⌘3</span></button>
+         </div>`);
+      setPill("Correct", "green"); setFoot(`<span class="right"><kbd>esc</kbd> fermer</span>`);
+    } else if (newLayout === "none") {
+      stateView("gray", ICON.check, "Rien à changer", mode === "pro"
+        ? "Le modèle juge ton texte déjà professionnel."
+        : "Le modèle n'a rien modifié avec cette consigne. Essaie de la reformuler.");
+      setPill("", ""); setFoot(`<span class="right"><kbd>esc</kbd> fermer</span>`);
+    } else if (newLayout === "rewrite") {
+      comparing = false; show("vRewrite"); renderRewrite();
+    } else if (newLayout === "cards") {
+      show("vCards"); renderCard(true);
+    } else {
+      show("vDoc"); renderDoc();
+    }
+  },
+  onError(msg) {
+    busy = false; layout = "error";
+    stateView("orange", ICON.warn, "Correction impossible", msg,
+      `<button class="btn plain" onclick="chooseMode(mode === 'custom' ? 'casual' : mode)">Réessayer</button>`);
+    setPill("Erreur", "orange"); setFoot(`<span class="right"><kbd>esc</kbd> fermer</span>`);
+  },
+  updateHistory() {},
+};
+applyMode("casual");
 </script>
 </body>
 </html>

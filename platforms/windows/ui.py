@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QMenu,
 )
 from PyQt6.QtCore import Qt, QObject, pyqtSignal
-from PyQt6.QtGui import QIcon, QPixmap, QPainter, QFont, QColor
+from PyQt6.QtGui import QIcon, QPixmap, QPainter, QFont, QColor, QClipboard
 
 from clipboard import get_app_and_copy, paste_text
 from llm import polish_text
@@ -83,6 +83,31 @@ def _update_history_menu() -> None:
         )
 
 
+# Light refresh aligned with the macOS popup: same palette (system blue /
+# indigo accents), rounded surfaces, Segoe UI Variable. Not tested on Windows
+# from the macOS dev machine.
+_STYLE = """
+QWidget#panel { background: #f3f3f6; }
+QLabel#title { font: 600 11pt "Segoe UI Variable", "Segoe UI"; color: #1c1c1e; }
+QLabel#status { font: 9pt "Segoe UI Variable", "Segoe UI"; color: #8a8a8e; }
+QLabel#status[error="true"] { color: #d70015; }
+QTextEdit#text {
+    background: #ffffff; border: 1px solid #e3e3e8; border-radius: 10px;
+    padding: 8px; font: 10.5pt "Segoe UI Variable", "Segoe UI"; color: #1c1c1e;
+    selection-background-color: #cfe3ff;
+}
+QPushButton {
+    background: #e8e8ed; border: none; border-radius: 7px; padding: 7px 12px;
+    font: 600 9.5pt "Segoe UI Variable", "Segoe UI"; color: #1c1c1e;
+}
+QPushButton:hover { background: #dedee4; }
+QPushButton:disabled { color: #a1a1a6; }
+QPushButton#primary { background: #007aff; color: white; }
+QPushButton#primary:hover { background: #0a6fe8; }
+QPushButton#primary:disabled { background: #9cc7ff; color: white; }
+"""
+
+
 # ---------------------------------------------------------------------------
 # Panel widget (hides instead of closing)
 # ---------------------------------------------------------------------------
@@ -111,8 +136,10 @@ class TextPolishPanel(QObject):
 
     def _create_panel(self):
         self._panel = _Panel()
+        self._panel.setObjectName("panel")
+        self._panel.setStyleSheet(_STYLE)
         self._panel.setWindowTitle("TextPolish")
-        self._panel.setFixedSize(440, 330)
+        self._panel.setFixedSize(420, 300)
         self._panel.setWindowFlags(
             Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool
@@ -120,35 +147,35 @@ class TextPolishPanel(QObject):
         )
 
         layout = QVBoxLayout(self._panel)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(8)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(10)
 
         # Title
         title = QLabel("TextPolish")
-        title.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
+        title.setObjectName("title")
         layout.addWidget(title)
 
         # Text preview
         self._text_view = QTextEdit()
         self._text_view.setReadOnly(True)
-        self._text_view.setFont(QFont("Segoe UI", 11))
+        self._text_view.setObjectName("text")
         layout.addWidget(self._text_view, stretch=1)
 
         # Status label
         self._status = QLabel("")
-        self._status.setFont(QFont("Segoe UI", 9))
-        self._status.setStyleSheet("color: gray;")
+        self._status.setObjectName("status")
         layout.addWidget(self._status)
 
         # Buttons
         btn_row = QHBoxLayout()
-        self._btn_pro = QPushButton("Professional")
+        self._btn_pro = QPushButton("Pro")
         self._btn_pro.clicked.connect(lambda: self._start_process("pro"))
-        self._btn_casual = QPushButton("Casual")
+        self._btn_casual = QPushButton("Correction")
+        self._btn_casual.setObjectName("primary")
         self._btn_casual.clicked.connect(lambda: self._start_process("casual"))
         self._btn_custom = QPushButton("Custom")
         self._btn_custom.clicked.connect(self._open_custom_dialog)
-        for btn in (self._btn_pro, self._btn_casual, self._btn_custom):
+        for btn in (self._btn_casual, self._btn_pro, self._btn_custom):
             btn_row.addWidget(btn)
         layout.addLayout(btn_row)
 
@@ -164,15 +191,12 @@ class TextPolishPanel(QObject):
     def _show(self):
         if self._selected_text.strip():
             self._text_view.setText(self._selected_text)
-            self._text_view.setStyleSheet("")
             self._set_enabled(True)
         else:
             self._text_view.setText("No text selected — select text first")
-            self._text_view.setStyleSheet("color: gray;")
             self._set_enabled(False)
 
-        self._status.setText("")
-        self._status.setStyleSheet("color: gray;")
+        self._set_status("")
 
         # Center on primary screen
         screen = QApplication.primaryScreen().availableGeometry()
@@ -196,6 +220,7 @@ class TextPolishPanel(QObject):
             return
         self._current_mode = mode
         self._set_enabled(False)
+        self._set_status("Preparing correction.")
         self._job_runner.start(
             self._selected_text, mode, custom_prompt,
             status_steps=_STATUS_STEPS,
@@ -209,7 +234,6 @@ class TextPolishPanel(QObject):
 
     def _on_stream_start(self):
         self._status.setText("")
-        self._text_view.setStyleSheet("")
         self._text_view.setText("")
 
     def _on_success(self, result: str):
@@ -218,14 +242,18 @@ class TextPolishPanel(QObject):
         _add_to_history(self._selected_text, result, self._current_mode)
 
     def _on_error(self, message: str):
-        short = message[:60] + ("…" if len(message) > 60 else "")
-        self._status.setText(f"Error: {short}")
-        self._status.setStyleSheet("color: red;")
+        self._status.setText(message)
+        self._status.setWordWrap(True)
+        self._status.setProperty("error", True)
+        self._status.style().unpolish(self._status)
+        self._status.style().polish(self._status)
         self._set_enabled(True)
 
     def _set_status(self, message: str):
         self._status.setText(message)
-        self._status.setStyleSheet("color: gray;")
+        self._status.setProperty("error", False)
+        self._status.style().unpolish(self._status)
+        self._status.style().polish(self._status)
 
     def _open_custom_dialog(self):
         dlg = QDialog(self._panel)
@@ -285,6 +313,7 @@ def _create_tray(panel: TextPolishPanel) -> QSystemTrayIcon:
 
     menu = QMenu()
 
+    # History submenu
     history_menu = QMenu("History")
     no_history = history_menu.addAction("No corrections yet")
     no_history.setEnabled(False)
