@@ -10,12 +10,17 @@ import pyperclip
 from pynput.keyboard import Controller, Key
 
 if sys.platform == "darwin":
-    from AppKit import NSWorkspace  # type: ignore
+    from AppKit import NSWorkspace, NSPasteboard, NSPasteboardItem  # type: ignore
     from Quartz import (  # type: ignore
         CGEventCreateKeyboardEvent,
         CGEventSetFlags,
         CGEventPostToPid,
+        CGEventSourceFlagsState,
+        kCGEventSourceStateHIDSystemState,
         kCGEventFlagMaskCommand,
+        kCGEventFlagMaskAlternate,
+        kCGEventFlagMaskShift,
+        kCGEventFlagMaskControl,
     )
 elif sys.platform == "win32":
     import ctypes
@@ -41,10 +46,68 @@ def get_frontmost_app():
     return None
 
 
+_COPY_TIMEOUT = 1.0
+_COPY_POLL = 0.02
+_RELEASE_TIMEOUT = 1.0
+
+
+def _wait_for_modifiers_released() -> None:
+    """The shortcut fires while the user still holds its modifiers. Copying
+    right away would send e.g. ⌥⌘C ("copy style") instead of ⌘C and copy
+    nothing, so wait (briefly) until the physical modifiers are up."""
+    if sys.platform != "darwin":
+        return
+    mask = (kCGEventFlagMaskCommand | kCGEventFlagMaskAlternate
+            | kCGEventFlagMaskShift | kCGEventFlagMaskControl)
+    waited = 0.0
+    while waited < _RELEASE_TIMEOUT:
+        if not CGEventSourceFlagsState(kCGEventSourceStateHIDSystemState) & mask:
+            return
+        time.sleep(_COPY_POLL)
+        waited += _COPY_POLL
+
+
+def _snapshot_clipboard():
+    """Capture the current clipboard so it can be restored later.
+    macOS: every item and type (images, files, rich text). Elsewhere: plain text."""
+    if sys.platform == "darwin":
+        pb = NSPasteboard.generalPasteboard()
+        items = []
+        for item in pb.pasteboardItems() or []:
+            data = {t: item.dataForType_(t) for t in item.types()}
+            items.append({t: d for t, d in data.items() if d is not None})
+        return ("mac", items)
+    try:
+        return ("text", pyperclip.paste() or "")
+    except Exception:
+        return ("text", "")
+
+
+def _restore_clipboard(snapshot) -> None:
+    kind, content = snapshot
+    if kind == "mac":
+        pb = NSPasteboard.generalPasteboard()
+        pb.clearContents()
+        restored = []
+        for data in content:
+            item = NSPasteboardItem.alloc().init()
+            for t, d in data.items():
+                item.setData_forType_(d, t)
+            restored.append(item)
+        if restored:
+            pb.writeObjects_(restored)
+    else:
+        pyperclip.copy(content)
+
+
 def get_app_and_copy() -> tuple[object, str]:
     """
     Capture the frontmost app, simulate Cmd/Ctrl+C, return (app_ref, selected_text).
     app_ref is saved and passed to paste_text() to restore focus after polishing.
+
+    The clipboard is emptied before copying so that "nothing selected" is
+    detectable (empty result) instead of returning stale clipboard content,
+    and the user's original clipboard is restored right after.
     """
     app_ref = get_frontmost_app()
 
@@ -54,27 +117,34 @@ def get_app_and_copy() -> tuple[object, str]:
         app_name = str(app_ref)
     logging.debug("Source app: %r", app_name)
 
+    _wait_for_modifiers_released()
+    snapshot = _snapshot_clipboard()
     try:
-        before = pyperclip.paste() or ""
-    except Exception:
-        before = ""
+        pyperclip.copy("")
+        with _kbd.pressed(_MOD):
+            _kbd.press('c')
+            _kbd.release('c')
 
-    with _kbd.pressed(_MOD):
-        _kbd.press('c')
-        _kbd.release('c')
-
-    time.sleep(0.35)
-
-    try:
-        text = pyperclip.paste() or ""
+        text = ""
+        waited = 0.0
+        while waited < _COPY_TIMEOUT:
+            time.sleep(_COPY_POLL)
+            waited += _COPY_POLL
+            text = pyperclip.paste() or ""
+            if text:
+                break
     except Exception as e:
-        logging.error("Clipboard read error: %s", e)
-        return app_ref, ""
+        logging.error("Clipboard error: %s", e)
+        text = ""
+    finally:
+        try:
+            _restore_clipboard(snapshot)
+        except Exception as e:
+            logging.error("Could not restore clipboard: %s", e)
 
-    if text == before:
-        logging.warning("Clipboard unchanged after Cmd/Ctrl+C")
-
-    logging.debug("Copied text (%d chars): %r", len(text), text[:60])
+    if not text:
+        logging.warning("Nothing copied after Cmd/Ctrl+C (no selection?)")
+    logging.debug("Copied %d chars", len(text))
     return app_ref, text
 
 
@@ -115,20 +185,25 @@ def paste_text(text: str, app_ref=None) -> None:
     Windows: restores focus to the source window, then sends Ctrl+V.
     """
     logging.debug("Pasting (%d chars)", len(text))
+    snapshot = _snapshot_clipboard()
     pyperclip.copy(text)
     time.sleep(0.05)
 
-    if app_ref is None:
-        # Fallback: paste into whatever is currently focused
-        with _kbd.pressed(_MOD):
-            _kbd.press('v')
-            _kbd.release('v')
-        return
-
-    if sys.platform == "darwin":
-        pid = app_ref.processIdentifier()
-        _paste_to_pid(pid)
-    elif sys.platform == "win32":
-        _paste_windows(app_ref)
+    try:
+        if app_ref is None:
+            # Fallback: paste into whatever is currently focused
+            with _kbd.pressed(_MOD):
+                _kbd.press('v')
+                _kbd.release('v')
+        elif sys.platform == "darwin":
+            _paste_to_pid(app_ref.processIdentifier())
+        elif sys.platform == "win32":
+            _paste_windows(app_ref)
+        time.sleep(0.15)  # let the target app read the clipboard before restoring
+    finally:
+        try:
+            _restore_clipboard(snapshot)
+        except Exception as e:
+            logging.error("Could not restore clipboard: %s", e)
 
     logging.debug("Paste sent")

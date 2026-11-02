@@ -123,3 +123,19 @@ class TestStartIntegration:
 
         assert done.wait(timeout=2)
         assert errors == ["boom"]
+
+
+class TestStaleJobs:
+    def test_finish_ignores_superseded_job(self):
+        runner = PolishJobRunner(on_main=lambda fn: fn())
+        runner._stream_job = 2
+        calls = []
+        runner._finish(calls.append, "old result", job_id=1)
+        assert calls == []
+
+    def test_finish_accepts_current_job(self):
+        runner = PolishJobRunner(on_main=lambda fn: fn())
+        runner._stream_job = 2
+        calls = []
+        runner._finish(calls.append, "result", job_id=2)
+        assert calls == ["result"]

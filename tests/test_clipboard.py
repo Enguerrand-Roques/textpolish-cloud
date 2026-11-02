@@ -39,42 +39,64 @@ class TestGetFrontmostApp:
 
 
 class TestGetAppAndCopy:
-    def test_normal_case_returns_app_and_new_clipboard_text(self):
+    def _run(self, paste_values):
         app_ref = MagicMock()
         with patch.object(clipboard, "get_frontmost_app", return_value=app_ref), \
              patch.object(clipboard, "pyperclip") as mock_pyperclip, \
              patch.object(clipboard, "_kbd") as mock_kbd, \
+             patch.object(clipboard, "_snapshot_clipboard", return_value=("text", "orig")) as snap, \
+             patch.object(clipboard, "_restore_clipboard") as restore, \
+             patch.object(clipboard, "_wait_for_modifiers_released"), \
              patch.object(clipboard.time, "sleep"):
-            mock_pyperclip.paste.side_effect = ["before", "after"]
-            result_app, text = clipboard.get_app_and_copy()
+            mock_pyperclip.paste.side_effect = paste_values
+            result = clipboard.get_app_and_copy()
+        return app_ref, result, mock_pyperclip, mock_kbd, restore
 
+    def test_normal_case_returns_app_and_copied_text(self):
+        app_ref, (result_app, text), pyper, kbd, _ = self._run(["selected"])
         assert result_app is app_ref
-        assert text == "after"
-        mock_kbd.press.assert_called_once_with("c")
-        mock_kbd.release.assert_called_once_with("c")
+        assert text == "selected"
+        kbd.press.assert_called_once_with("c")
+        kbd.release.assert_called_once_with("c")
 
-    def test_clipboard_unchanged_still_returns_the_text(self):
-        app_ref = MagicMock()
-        with patch.object(clipboard, "get_frontmost_app", return_value=app_ref), \
-             patch.object(clipboard, "pyperclip") as mock_pyperclip, \
-             patch.object(clipboard, "_kbd"), \
-             patch.object(clipboard.time, "sleep"):
-            mock_pyperclip.paste.side_effect = ["same", "same"]
-            _, text = clipboard.get_app_and_copy()
+    def test_clipboard_is_emptied_before_copy(self):
+        _, _, pyper, _, _ = self._run(["selected"])
+        pyper.copy.assert_called_once_with("")
 
-        assert text == "same"
+    def test_waits_until_clipboard_is_filled(self):
+        _, (_, text), _, _, _ = self._run(["", "", "slow app text"])
+        assert text == "slow app text"
 
-    def test_clipboard_read_error_returns_empty_string(self):
-        app_ref = MagicMock()
-        with patch.object(clipboard, "get_frontmost_app", return_value=app_ref), \
-             patch.object(clipboard, "pyperclip") as mock_pyperclip, \
-             patch.object(clipboard, "_kbd"), \
-             patch.object(clipboard.time, "sleep"):
-            mock_pyperclip.paste.side_effect = ["before", Exception("boom")]
-            result_app, text = clipboard.get_app_and_copy()
+    def test_nothing_selected_returns_empty_string_not_stale_clipboard(self):
+        _, (_, text), _, _, _ = self._run([""] * 100)
+        assert text == ""
 
+    def test_original_clipboard_is_restored(self):
+        _, _, _, _, restore = self._run(["selected"])
+        restore.assert_called_once_with(("text", "orig"))
+
+    def test_clipboard_read_error_returns_empty_string_and_restores(self):
+        app_ref, (result_app, text), _, _, restore = self._run([Exception("boom")])
         assert result_app is app_ref
         assert text == ""
+        restore.assert_called_once()
+
+
+class TestClipboardSnapshot:
+    def test_text_snapshot_round_trip_on_non_mac(self):
+        with patch.object(clipboard.sys, "platform", "linux"), \
+             patch.object(clipboard, "pyperclip") as pyper:
+            pyper.paste.return_value = "hello"
+            snap = clipboard._snapshot_clipboard()
+            clipboard._restore_clipboard(snap)
+        assert snap == ("text", "hello")
+        pyper.copy.assert_called_once_with("hello")
+
+    def test_text_snapshot_survives_read_error(self):
+        with patch.object(clipboard.sys, "platform", "linux"), \
+             patch.object(clipboard, "pyperclip") as pyper:
+            pyper.paste.side_effect = Exception("no clipboard")
+            assert clipboard._snapshot_clipboard() == ("text", "")
 
 
 class TestPasteToPid:
@@ -120,6 +142,8 @@ class TestPasteText:
     def test_always_copies_to_clipboard_first(self):
         with patch.object(clipboard, "pyperclip") as mock_pyperclip, \
              patch.object(clipboard, "_kbd"), \
+             patch.object(clipboard, "_snapshot_clipboard", return_value=("text", "")), \
+             patch.object(clipboard, "_restore_clipboard"), \
              patch.object(clipboard.time, "sleep"):
             clipboard.paste_text("hello world")
 
@@ -128,6 +152,8 @@ class TestPasteText:
     def test_no_app_ref_falls_back_to_focused_window(self):
         with patch.object(clipboard, "pyperclip"), \
              patch.object(clipboard, "_kbd") as mock_kbd, \
+             patch.object(clipboard, "_snapshot_clipboard", return_value=("text", "")), \
+             patch.object(clipboard, "_restore_clipboard"), \
              patch.object(clipboard.time, "sleep"):
             clipboard.paste_text("hello", app_ref=None)
 
@@ -138,6 +164,8 @@ class TestPasteText:
         app_ref = MagicMock()
         app_ref.processIdentifier.return_value = 42
         with patch.object(clipboard, "pyperclip"), \
+             patch.object(clipboard, "_snapshot_clipboard", return_value=("text", "")), \
+             patch.object(clipboard, "_restore_clipboard"), \
              patch.object(clipboard.sys, "platform", "darwin"), \
              patch.object(clipboard, "_paste_to_pid") as mock_paste_pid, \
              patch.object(clipboard.time, "sleep"):
@@ -147,9 +175,57 @@ class TestPasteText:
 
     def test_win32_dispatches_to_paste_windows(self):
         with patch.object(clipboard, "pyperclip"), \
+             patch.object(clipboard, "_snapshot_clipboard", return_value=("text", "")), \
+             patch.object(clipboard, "_restore_clipboard"), \
              patch.object(clipboard.sys, "platform", "win32"), \
              patch.object(clipboard, "_paste_windows") as mock_paste_windows, \
              patch.object(clipboard.time, "sleep"):
             clipboard.paste_text("hi", app_ref=555)
 
         mock_paste_windows.assert_called_once_with(555)
+
+    def test_clipboard_restored_after_paste_even_if_paste_fails(self):
+        with patch.object(clipboard, "pyperclip"), \
+             patch.object(clipboard, "_snapshot_clipboard", return_value=("text", "orig")), \
+             patch.object(clipboard, "_restore_clipboard") as restore, \
+             patch.object(clipboard, "_kbd") as kbd, \
+             patch.object(clipboard.time, "sleep"):
+            kbd.pressed.side_effect = RuntimeError("keystroke failed")
+            try:
+                clipboard.paste_text("x", app_ref=None)
+            except RuntimeError:
+                pass
+        restore.assert_called_once_with(("text", "orig"))
+
+
+class TestWaitForModifiers:
+    def test_returns_immediately_off_macos(self):
+        with patch.object(clipboard.sys, "platform", "linux"), \
+             patch.object(clipboard.time, "sleep") as sleep:
+            clipboard._wait_for_modifiers_released()
+        sleep.assert_not_called()
+
+    def test_waits_until_modifiers_are_up(self):
+        states = iter([0x80000, 0x80000, 0])
+        with patch.object(clipboard.sys, "platform", "darwin"), \
+             patch.object(clipboard, "CGEventSourceFlagsState", side_effect=lambda _: next(states), create=True), \
+             patch.object(clipboard, "kCGEventSourceStateHIDSystemState", 1, create=True), \
+             patch.object(clipboard, "kCGEventFlagMaskCommand", 0x100000, create=True), \
+             patch.object(clipboard, "kCGEventFlagMaskAlternate", 0x80000, create=True), \
+             patch.object(clipboard, "kCGEventFlagMaskShift", 0x20000, create=True), \
+             patch.object(clipboard, "kCGEventFlagMaskControl", 0x40000, create=True), \
+             patch.object(clipboard.time, "sleep") as sleep:
+            clipboard._wait_for_modifiers_released()
+        assert sleep.call_count == 2
+
+    def test_gives_up_after_timeout(self):
+        with patch.object(clipboard.sys, "platform", "darwin"), \
+             patch.object(clipboard, "CGEventSourceFlagsState", return_value=0x80000, create=True), \
+             patch.object(clipboard, "kCGEventSourceStateHIDSystemState", 1, create=True), \
+             patch.object(clipboard, "kCGEventFlagMaskCommand", 0x100000, create=True), \
+             patch.object(clipboard, "kCGEventFlagMaskAlternate", 0x80000, create=True), \
+             patch.object(clipboard, "kCGEventFlagMaskShift", 0x20000, create=True), \
+             patch.object(clipboard, "kCGEventFlagMaskControl", 0x40000, create=True), \
+             patch.object(clipboard.time, "sleep") as sleep:
+            clipboard._wait_for_modifiers_released()
+        assert sleep.call_count == int(clipboard._RELEASE_TIMEOUT / clipboard._COPY_POLL)

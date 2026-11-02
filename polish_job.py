@@ -73,9 +73,9 @@ class PolishJobRunner:
         def worker():
             try:
                 result = polish_fn(text, mode, custom_prompt, on_token=handle_token)
-                self._on_main(lambda r=result: self._finish(on_success, r))
+                self._on_main(lambda r=result, jid=job_id: self._finish(on_success, r, jid))
             except Exception as exc:
-                self._on_main(lambda e=exc: self._finish(on_error, str(e)))
+                self._on_main(lambda e=exc, jid=job_id: self._finish(on_error, str(e), jid))
 
         threading.Thread(target=status_worker, daemon=True).start()
         threading.Thread(target=worker, daemon=True).start()
@@ -93,6 +93,10 @@ class PolishJobRunner:
             on_stream_start()
         on_token(token)
 
-    def _finish(self, callback, arg):
+    def _finish(self, callback, arg, job_id=None):
+        # A newer job superseded this one: drop its result instead of letting
+        # it overwrite the current correction.
+        if job_id is not None and job_id != self._stream_job:
+            return
         self._status_job += 1
         callback(arg)
