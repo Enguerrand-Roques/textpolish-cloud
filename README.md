@@ -23,11 +23,11 @@ The popup reads the selection, then adapts: one card per correction for short te
 |---------|-------------|
 | **Three modes** | Correction (fixes mistakes only, default), Pro (⌘2, professional rewrite), Sur mesure (⌘3, your own request: translate, shorten, warmer…) |
 | **Review before pasting** | Accept or ignore each fix (↵ / ⇥), or everything at once (⌘↵) |
-| **Streaming output** | Corrected text appears word by word as Gemini generates — no waiting for the full response |
-| **Correction history** | Last 10 corrections available in the ✏️ menu → History. Click any entry to copy |
+| **Every fix explained** | Each correction is labelled (spelling, accent, conjugation, agreement, homophone, punctuation); short texts get one card per fix, long ones a highlighted document |
+| **Correction history** | Last 10 corrections in the ✏️ menu → Historique. Click an entry to copy |
 | **Privacy** | Your text is sent to Google Gemini for each request and the app does not log it. On the free tier Google may use requests to improve its products — use [TextPolish](https://github.com/Enguerrand-Roques/textpolish) (local) for sensitive text |
 | **System-level** | Works in any app — VS Code, Notion, Mail, Slack. Panel stays above fullscreen apps |
-| **Free tier** | 1 500 requests/day on Gemini free tier — no credit card required |
+| **Free tier** | No credit card required. Google caps requests per minute and per day (10 per minute on `gemini-2.5-flash-lite` when tested in November 2026); current limits: [Gemini rate limits](https://ai.google.dev/gemini-api/docs/rate-limits) |
 
 Shortcut: **Cmd+Option+G** (macOS) · **Ctrl+Alt+G** (Windows)
 
@@ -42,7 +42,7 @@ Before installing, grab a free Gemini API key — no credit card required:
 3. Click **Get API key** → **Create API key**
 4. Copy it — you'll paste it into `config.py` during setup
 
-Free tier: **1 500 requests/day**, which is more than enough for daily use.
+The free tier has per-minute and daily limits ([current values](https://ai.google.dev/gemini-api/docs/rate-limits)); normal daily use stays well under them.
 
 ---
 
@@ -108,7 +108,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.textpolish-clou
 | Problem | Fix |
 |---------|-----|
 | `Invalid API key` | Double-check your key in `config.py` — no extra spaces |
-| `API quota exceeded` | 1 500 req/day on free tier — wait until tomorrow |
+| `Too many requests in one minute` / `quota exceeded` | Free-tier limit: wait a few seconds (per-minute) or until the daily reset |
 | Shortcut not working | Grant Accessibility in System Settings |
 | Text not pasted back | Keep the source app focused |
 | App won't start | Check `/tmp/textpolish-cloud.log` for errors |
@@ -159,7 +159,7 @@ A ✏️ icon appears in the system tray — the app is running.
 | Problem | Fix |
 |---------|-----|
 | `Invalid API key` | Double-check your key in `config.py` — no extra spaces |
-| `API quota exceeded` | 1 500 req/day on free tier — wait until tomorrow |
+| `Too many requests in one minute` / `quota exceeded` | Free-tier limit: wait a few seconds (per-minute) or until the daily reset |
 | Shortcut not working | Make sure no other app uses Ctrl+Shift+P |
 | Text not pasted back | Keep the source app focused |
 
@@ -228,8 +228,8 @@ This project started as a way to understand how to use a cloud AI API in a real 
 
 Building it surfaced a few things that tutorials don't really cover:
 
-- **API latency in practice** — Gemini Flash responds in 1–3s for short texts. Fast enough to feel instant, but you still need a status indicator so the user knows something is happening.
-- **Free tier limits are real constraints** — 1 500 requests/day sounds like a lot until you use the tool heavily. Choosing the right model (`flash-lite` vs `flash`) is a real product decision, not just a performance one.
+- **API latency in practice** — `gemini-2.5-flash-lite` answered a short sentence in about 0.5 s in our tests, the first request included. Fast enough to feel instant, but you still need a status indicator for slow networks.
+- **Free tier limits are real constraints** — the daily cap sounds like a lot until you use the tool heavily, and the per-minute cap (10 on Flash-Lite) is easy to hit when testing. Choosing the right model (`flash-lite` vs `flash`) is a real product decision, not just a performance one.
 - **The API is the easy part** — calling Gemini takes 10 lines of code. The complexity was everywhere else: global shortcuts, clipboard handling, making a window appear above fullscreen apps, pasting into the right window without disrupting focus.
 - **Cloud vs. local** — no setup friction for the user (no Ollama, no model download), but you're dependent on internet and a third-party service. The right choice depends on who your users are.
 
