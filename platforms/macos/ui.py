@@ -230,14 +230,14 @@ class _PrefsHandler(NSObject):
         dlg = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
             NSMakeRect(0, 0, 390, 160), style, NSBackingStoreBuffered, False,
         )
-        dlg.setTitle_("Preferences")
+        dlg.setTitle_("Préférences")
         dlg.setLevel_(NSFloatingWindowLevel)
         dlg.setCollectionBehavior_(_COLLECTION)
         cv = dlg.contentView()
         W, H, pad = 390, 160, 16
 
         lbl = NSTextField.alloc().initWithFrame_(NSMakeRect(pad, H - 46, W - 2 * pad, 22))
-        lbl.setStringValue_("Keyboard shortcut (pynput format, e.g. <cmd>+<alt>+g):")
+        lbl.setStringValue_("Raccourci clavier (format pynput, ex. <cmd>+<alt>+g) :")
         lbl.setEditable_(False); lbl.setBordered_(False); lbl.setDrawsBackground_(False)
         lbl.setFont_(NSFont.systemFontOfSize_(12)); lbl.setTextColor_(NSColor.secondaryLabelColor())
         cv.addSubview_(lbl)
@@ -254,12 +254,12 @@ class _PrefsHandler(NSObject):
         cv.addSubview_(err)
 
         cancel_btn = NSButton.alloc().initWithFrame_(NSMakeRect(W - pad - 196, pad, 88, 34))
-        cancel_btn.setTitle_("Cancel"); cancel_btn.setBezelStyle_(1)
+        cancel_btn.setTitle_("Annuler"); cancel_btn.setBezelStyle_(1)
         cancel_btn.setTarget_(self); cancel_btn.setAction_("cancelPrefs:")
         cv.addSubview_(cancel_btn)
 
         save_btn = NSButton.alloc().initWithFrame_(NSMakeRect(W - pad - 100, pad, 100, 34))
-        save_btn.setTitle_("Save"); save_btn.setBezelStyle_(1)
+        save_btn.setTitle_("Enregistrer"); save_btn.setBezelStyle_(1)
         save_btn.setKeyEquivalent_("\r")
         save_btn.setTarget_(self); save_btn.setAction_("saveShortcut:")
         cv.addSubview_(save_btn)
@@ -300,7 +300,7 @@ def _update_history_menu() -> None:
         return
     _history_menu.removeAllItems()
     if not _history.entries:
-        empty = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("No corrections yet", None, "")
+        empty = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Aucune correction pour l'instant", None, "")
         empty.setEnabled_(False)
         _history_menu.addItem_(empty)
         return
@@ -310,7 +310,7 @@ def _update_history_menu() -> None:
         )
         item.setTarget_(_history_handler)
         item.setRepresentedObject_(entry["corrected"])
-        item.setToolTip_(f"Click to copy corrected text\n\n{format_tooltip(entry)}")
+        item.setToolTip_(f"Cliquer pour copier le texte corrigé\n\n{format_tooltip(entry)}")
         _history_menu.addItem_(item)
 
 
@@ -636,15 +636,15 @@ def _create_status_item():
     menu = NSMenu.alloc().init()
 
     prefs_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-        "Preferences…", "openPrefs:", ","
+        "Préférences…", "openPrefs:", ","
     )
     prefs_item.setTarget_(_prefs_handler)
     menu.addItem_(prefs_item)
     menu.addItem_(NSMenuItem.separatorItem())
 
-    history_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("History", None, "")
-    submenu = NSMenu.alloc().initWithTitle_("History")
-    empty = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("No corrections yet", None, "")
+    history_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Historique", None, "")
+    submenu = NSMenu.alloc().initWithTitle_("Historique")
+    empty = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Aucune correction pour l'instant", None, "")
     empty.setEnabled_(False)
     submenu.addItem_(empty)
     menu.addItem_(history_item)
@@ -653,7 +653,7 @@ def _create_status_item():
     menu.addItem_(NSMenuItem.separatorItem())
 
     quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
-        "Quit TextPolish", "terminate:", "q"
+        "Quitter TextPolish", "terminate:", "q"
     )
     menu.addItem_(quit_item)
     item.setMenu_(menu)

@@ -26,11 +26,16 @@ class CorrectionHistory:
         return entry
 
 
+# Names shown to the user; the mode ids stay internal.
+MODE_NAMES = {"casual": "Correction", "pro": "Pro", "custom": "Sur mesure"}
+
+
 def format_menu_label(entry: dict, truncate: int = LABEL_TRUNCATE_CHARS) -> str:
     orig_short = entry["original"][:truncate].replace("\n", " ")
     if len(entry["original"]) > truncate:
         orig_short += "…"
-    return f"[{entry['mode']}] {entry['ts']} — {orig_short}"
+    mode = MODE_NAMES.get(entry["mode"], entry["mode"])
+    return f"{entry['ts']}  {mode} — {orig_short}"
 
 
 def format_tooltip(entry: dict, truncate: int = TOOLTIP_TRUNCATE_CHARS) -> str:

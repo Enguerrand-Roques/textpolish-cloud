@@ -39,18 +39,22 @@ class TestFormatMenuLabel:
     def test_short_text_not_truncated(self):
         entry = self._entry(original="hello")
         label = format_menu_label(entry)
-        assert label == "[casual] 10:00 — hello"
+        assert label == "10:00  Correction — hello"
 
     def test_long_text_truncated_with_ellipsis(self):
         entry = self._entry(original="x" * 50)
         label = format_menu_label(entry)
-        assert label == f"[casual] 10:00 — {'x' * 40}…"
+        assert label == f"10:00  Correction — {'x' * 40}…"
 
     def test_newlines_replaced_with_spaces(self):
         entry = self._entry(original="line one\nline two")
         label = format_menu_label(entry)
         assert "\n" not in label
         assert "line one line two" in label
+
+    def test_mode_id_shown_with_its_display_name(self):
+        assert "Sur mesure" in format_menu_label(self._entry(mode="custom"))
+        assert "custom" not in format_menu_label(self._entry(mode="custom"))
 
 
 class TestFormatTooltip:
