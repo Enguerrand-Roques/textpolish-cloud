@@ -111,6 +111,11 @@ def polish_text(
             )
             result = response.text.strip()
     except errors.ClientError as e:
+        if e.code == 429 and "PerMinute" in str(e):
+            raise RuntimeError(
+                "Too many requests in one minute (Gemini free tier allows 10). "
+                "Wait a few seconds and try again."
+            )
         if e.code == 429:
             raise RuntimeError(
                 "Gemini quota exceeded for today. Free tier resets daily — "

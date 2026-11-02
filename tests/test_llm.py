@@ -101,6 +101,13 @@ class TestPolishText:
             with pytest.raises(RuntimeError, match="quota exceeded"):
                 polish_text("Hello", mode="pro")
 
+    def test_per_minute_limit_is_not_reported_as_daily_quota(self):
+        err = llm.errors.ClientError(
+            code=429, message="quotaId: GenerateRequestsPerMinutePerProjectPerModel-FreeTier")
+        with patch.object(llm._client.models, "generate_content", side_effect=err):
+            with pytest.raises(RuntimeError, match="one minute"):
+                polish_text("Hello", mode="pro")
+
     def test_invalid_api_key_raises_readable_message(self):
         err = llm.errors.ClientError(code=401, message="UNAUTHENTICATED")
         with patch.object(llm._client.models, "generate_content", side_effect=err):
