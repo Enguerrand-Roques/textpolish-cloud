@@ -74,6 +74,12 @@ class TestClassifyChange:
         assert classify_change("sa", "ça") == "grammar"
         assert classify_change("a", "à") == "grammar"
 
+    def test_english_homophones_and_verb_forms(self):
+        assert classify_change("Their", "They're") == "grammar"
+        assert classify_change("then", "than") == "grammar"
+        assert classify_change("finish", "finished") == "conjugation"
+        assert classify_change("go", "goes") == "agreement"
+
     def test_person_ending_is_conjugation(self):
         assert classify_change("peux", "peut") == "conjugation"
 

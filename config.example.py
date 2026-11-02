@@ -8,6 +8,9 @@ GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE"
 GEMINI_MODEL = "gemini-2.5-flash-lite"
 GEMINI_TIMEOUT = 30  # seconds — a hung request would otherwise block indefinitely
 
+# Interface language: "en" (default) or "fr", also from ✏️ → Language.
+UI_LANGUAGE = "en"
+
 # Global keyboard shortcut (pynput format)
 # macOS: Cmd+Option+G  |  Windows: Ctrl+Alt+G  (no known conflicts)
 SHORTCUT = "<cmd>+<alt>+g"

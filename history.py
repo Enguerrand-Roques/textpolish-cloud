@@ -2,6 +2,8 @@
 
 import datetime
 
+from i18n import t
+
 DEFAULT_MAX_ENTRIES = 10
 LABEL_TRUNCATE_CHARS = 40
 TOOLTIP_TRUNCATE_CHARS = 200
@@ -26,15 +28,13 @@ class CorrectionHistory:
         return entry
 
 
-# Names shown to the user; the mode ids stay internal.
-MODE_NAMES = {"casual": "Correction", "pro": "Pro", "custom": "Sur mesure"}
 
 
 def format_menu_label(entry: dict, truncate: int = LABEL_TRUNCATE_CHARS) -> str:
     orig_short = entry["original"][:truncate].replace("\n", " ")
     if len(entry["original"]) > truncate:
         orig_short += "…"
-    mode = MODE_NAMES.get(entry["mode"], entry["mode"])
+    mode = t("mode_" + entry["mode"]) if entry["mode"] in ("casual", "pro", "custom") else entry["mode"]
     return f"{entry['ts']}  {mode} — {orig_short}"
 
 

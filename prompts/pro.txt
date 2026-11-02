@@ -8,4 +8,5 @@ Rules:
 5. Replace informal or slang expressions with professional alternatives.
 6. Use a formal tone appropriate for professional contexts.
 7. Do NOT shorten the text unless required for clarity.
-8. Return ONLY the rewritten text. No explanations, no quotes, no alternatives.
+8. Keep the same kind of message: do NOT turn a short message into an e-mail. Never add a greeting, a signature or placeholders like [Name] that are not in the input.
+9. Return ONLY the rewritten text. No explanations, no quotes, no alternatives.

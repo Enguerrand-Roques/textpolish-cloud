@@ -53,7 +53,7 @@ class TestFormatMenuLabel:
         assert "line one line two" in label
 
     def test_mode_id_shown_with_its_display_name(self):
-        assert "Sur mesure" in format_menu_label(self._entry(mode="custom"))
+        assert "Custom" in format_menu_label(self._entry(mode="custom"))
         assert "custom" not in format_menu_label(self._entry(mode="custom"))
 
 

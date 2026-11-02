@@ -7,6 +7,8 @@ import os
 import re
 import unicodedata
 
+from i18n import t
+
 _TOKEN_RE = re.compile(r"\s+|\w+|[^\w\s]")
 
 
@@ -36,16 +38,8 @@ def compute_word_diff(original: str, corrected: str) -> list[dict]:
 # Corrections: the unit the popup shows and lets the user accept or ignore
 # ---------------------------------------------------------------------------
 
-KIND_LABELS = {
-    "accent": "Accent",
-    "case": "Majuscule",
-    "punctuation": "Ponctuation",
-    "spelling": "Orthographe",
-    "agreement": "Accord",
-    "conjugation": "Conjugaison",
-    "grammar": "Grammaire",
-    "rewrite": "Reformulation",
-}
+# Kinds of fix; the label shown for each comes from i18n.py ("kind_<name>").
+KINDS = ("accent", "case", "punctuation", "spelling", "agreement", "conjugation", "grammar", "rewrite")
 
 _CARDS_MAX_CHANGES = 3
 _CARDS_MAX_CHARS = 280
@@ -84,7 +78,12 @@ _HOMOPHONES = {
     "a", "à", "ces", "ses", "c'est", "s'est", "sait", "sa", "ça", "ce", "se", "et", "est",
     "ou", "où", "on", "ont", "son", "sont", "la", "là", "l'a", "leur", "leurs",
     "quel", "quelle", "qu'elle", "peu", "peut", "mes", "mais", "m'est",
+    # English
+    "their", "there", "they're", "your", "you're", "its", "it's", "to", "too", "two",
+    "then", "than", "whose", "who's", "were", "where", "we're", "lose", "loose",
+    "affect", "effect", "accept", "except",
 }
+_EN_VERB_SUFFIXES = {"ed", "d", "ing"}
 
 
 def _is_agreement(b: str, a: str) -> bool:
@@ -94,7 +93,10 @@ def _is_agreement(b: str, a: str) -> bool:
 
 
 def _is_conjugation(b: str, a: str) -> bool:
-    """Same stem, two different verb endings (valider → validés)."""
+    """Same stem, two different verb endings (valider → validés, finish → finished)."""
+    short, long_ = sorted((b, a), key=len)
+    if long_.startswith(short) and long_[len(short):] in _EN_VERB_SUFFIXES and len(short) >= 3:
+        return True
     prefix = len(os.path.commonprefix([b, a]))
     for k in range(prefix, max(1, prefix - 3), -1):
         eb, ea = b[k:], a[k:]
@@ -110,7 +112,7 @@ def classify_change(before: str, after: str) -> str:
         return "punctuation"
     if b.lower() == a.lower():
         return "case"
-    if b.lower() in _HOMOPHONES and a.lower() in _HOMOPHONES:
+    if b.lower().replace("’", "'") in _HOMOPHONES and a.lower().replace("’", "'") in _HOMOPHONES:
         return "grammar"
     if _strip_accents(b).lower() == _strip_accents(a).lower():
         return "accent"
@@ -166,7 +168,7 @@ def group_changes(original: str, corrected: str) -> list[dict]:
         else:
             kind = classify_change(before, after)
             parts.append({"op": "change", "id": 0, "before": before,
-                          "after": after, "kind": kind, "label": KIND_LABELS[kind]})
+                          "after": after, "kind": kind, "label": t("kind_" + kind)})
 
     change_no = 0
     for i, p in enumerate(parts):

@@ -8,10 +8,10 @@
 Select text in any app, press **⌥⌘G**, review the fixes, and the text is pasted back. Runs silently in the menubar / system tray.
 
 <p align="center">
-  <img src="docs/popup-document.png" width="440" alt="TextPolish Cloud popup under a paragraph in TextEdit, with 8 spelling fixes highlighted and an Apply button">
+  <img src="docs/popup-document.png" width="440" alt="TextPolish Cloud popup under an English paragraph in TextEdit, with 8 fixes highlighted (grammar, agreement, verb forms) and an Apply button">
 </p>
 
-The popup reads the selection, then adapts: one card per correction for short texts, a highlighted document for long ones (above), a single rewrite in Pro / Sur mesure.
+The popup reads the selection, then adapts: one card per correction for short texts, a highlighted document for long ones (above), a single rewrite in Pro / Custom.
 
 > **Prefer a fully offline version?** → [TextPolish](https://github.com/Enguerrand-Roques/textpolish) uses a local Ollama model — no internet required.
 
@@ -21,10 +21,11 @@ The popup reads the selection, then adapts: one card per correction for short te
 
 | Feature | Description |
 |---------|-------------|
-| **Three modes** | Correction (fixes mistakes only, default), Pro (⌘2, professional rewrite), Sur mesure (⌘3, your own request: translate, shorten, warmer…) |
+| **Three modes** | Correction (fixes mistakes only, default), Pro (⌘2, professional rewrite), Custom (⌘3, your own request: translate, shorten, warmer…) |
+| **English and French** | Corrects and rewrites both languages. The interface is in English or French: switch from ✏️ → Language, it is remembered |
 | **Review before pasting** | Accept or ignore each fix (↵ / ⇥), or everything at once (⌘↵) |
 | **Every fix explained** | Each correction is labelled (spelling, accent, conjugation, agreement, homophone, punctuation); short texts get one card per fix, long ones a highlighted document |
-| **Correction history** | Last 10 corrections in the ✏️ menu → Historique. Click an entry to copy |
+| **Correction history** | Last 10 corrections in the ✏️ menu → History. Click an entry to copy |
 | **Privacy** | Your text is sent to Google Gemini for each request and the app does not log it. On the free tier Google may use requests to improve its products — use [TextPolish](https://github.com/Enguerrand-Roques/textpolish) (local) for sensitive text |
 | **System-level** | Works in any app — VS Code, Notion, Mail, Slack. Panel stays above fullscreen apps |
 | **Free tier** | No credit card required. Google caps requests per minute and per day (10 per minute on `gemini-2.5-flash-lite` when tested in November 2026); current limits: [Gemini rate limits](https://ai.google.dev/gemini-api/docs/rate-limits) |
@@ -193,7 +194,7 @@ Available models (all on the free tier):
 |------|----------|
 | **Correction** (default) | SMS, DMs, notes — fixes mistakes, keeps your words and tone |
 | **Pro** (⌘2) | Emails, reports, LinkedIn, formal writing |
-| **Sur mesure** (⌘3) | Your own request: translate, shorten, warmer, funnier |
+| **Custom** (⌘3) | Your own request: translate, shorten, warmer, funnier (“Sur mesure” in the French interface) |
 
 **Speed:** about 0.5 s per request, measured on `gemini-2.5-flash-lite`; the first request after launch is no slower, since there is no model to load. Depends on your connection. The free tier allows 10 requests per minute.
 
