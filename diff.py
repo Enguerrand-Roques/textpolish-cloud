@@ -27,6 +27,29 @@ _CARDS_MAX_CHARS = 280
 _CONTEXT_WORDS = 4
 
 
+_KEPT_MARKS = set("?!")
+
+
+def keep_question_marks(original: str, corrected: str) -> str:
+    """Put back any "?" or "!" the model dropped without replacing it.
+
+    Small models sometimes merge "tu fais quoi ce soir ? on se voit" into one
+    sentence. A correction should never remove the user's question or
+    exclamation: only deletions made of these marks (and spaces) are undone,
+    so a model that rewrites "?" into "." or moves it is left alone.
+    """
+    a, b = _tokenize(original), _tokenize(corrected)
+    sm = difflib.SequenceMatcher(a=a, b=b, autojunk=False)
+    out: list[str] = []
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        before, after = "".join(a[i1:i2]), "".join(b[j1:j2])
+        marks = before.strip()
+        dropped = (tag in ("delete", "replace") and marks and set(marks) <= _KEPT_MARKS | {" "}
+                   and not after.strip())
+        out.append(before if dropped else after)
+    return "".join(out)
+
+
 def _strip_accents(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", s)
                    if unicodedata.category(c) != "Mn")

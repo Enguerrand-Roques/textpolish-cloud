@@ -168,3 +168,22 @@ class TestLayoutThresholds:
     def test_280_characters_are_cards_281_are_a_document(self):
         assert choose_layout(self._parts(1), "x" * 280) == "cards"
         assert choose_layout(self._parts(1), "x" * 281) == "document"
+
+
+from diff import keep_question_marks
+
+
+class TestKeepQuestionMarks:
+    def test_dropped_question_mark_is_put_back(self):
+        # The only miss of Round 6: two questions merged into one sentence.
+        assert keep_question_marks(
+            "slt tu fait quoi ce soir ? on peut se retrouver vers 19h",
+            "slt tu fais quoi ce soir on peut se retrouver vers 19h",
+        ) == "slt tu fais quoi ce soir ? on peut se retrouver vers 19h"
+
+    def test_other_fixes_are_kept(self):
+        assert keep_question_marks("tu viens?", "Tu viens ?") == "Tu viens ?"
+        assert keep_question_marks("Est ce que tu peux ?", "Est-ce que tu peux ?") == "Est-ce que tu peux ?"
+
+    def test_mark_replaced_by_other_punctuation_is_left_alone(self):
+        assert keep_question_marks("on se voit ? oui", "On se voit. Oui") == "On se voit. Oui"
