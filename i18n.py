@@ -35,6 +35,20 @@ STRINGS = {
         "prefs_label": "Keyboard shortcut (pynput format, e.g. <cmd>+<alt>+g):",
         "cancel": "Cancel",
         "save": "Save",
+        "ax_title": "Accessibility permission required",
+        "ax_text": "TextPolish needs Accessibility access to listen for the global "
+                   "keyboard shortcut. Grant it in System Settings → Privacy & "
+                   "Security → Accessibility, then restart TextPolish.",
+        "ax_open": "Open System Settings",
+        # Windows panel (experimental)
+        "status_prepare": "Preparing correction",
+        "status_load": "Loading local model",
+        "status_rewrite": "Rewriting text",
+        "status_finish": "Finishing",
+        "custom_title": "Custom instruction",
+        "custom_label": "Describe how to rewrite the text:",
+        "custom_default": "Rewrite this text keeping my style, make it punchier.",
+        "apply": "Apply",
     },
     "fr": {
         "mode_casual": "Correction",
@@ -58,6 +72,20 @@ STRINGS = {
         "prefs_label": "Raccourci clavier (format pynput, ex. <cmd>+<alt>+g) :",
         "cancel": "Annuler",
         "save": "Enregistrer",
+        "ax_title": "Autorisation d'accessibilité requise",
+        "ax_text": "TextPolish a besoin de l'accès Accessibilité pour détecter le "
+                   "raccourci clavier global. Autorisez-le dans Réglages Système → "
+                   "Confidentialité et sécurité → Accessibilité, puis relancez TextPolish.",
+        "ax_open": "Ouvrir Réglages Système",
+        # Windows panel (experimental)
+        "status_prepare": "Préparation de la correction",
+        "status_load": "Chargement du modèle local",
+        "status_rewrite": "Réécriture du texte",
+        "status_finish": "Finalisation",
+        "custom_title": "Instruction sur mesure",
+        "custom_label": "Décrivez comment réécrire le texte :",
+        "custom_default": "Réécris ce texte en gardant mon style, rends-le plus percutant.",
+        "apply": "Appliquer",
     },
 }
 

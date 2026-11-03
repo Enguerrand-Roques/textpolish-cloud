@@ -112,11 +112,21 @@ def _read_shortcut_from_config() -> str:
     return "<cmd>+<alt>+g"
 
 
+def _visible_frame_at(x: float, y: float):
+    """Visible frame (minus menu bar and Dock) of the screen holding the
+    Cocoa point (x, y); the main screen's if the point is off every screen."""
+    for screen in NSScreen.screens():
+        f = screen.frame()
+        if f.origin.x <= x < f.origin.x + f.size.width and f.origin.y <= y < f.origin.y + f.size.height:
+            return screen.visibleFrame()
+    return NSScreen.mainScreen().visibleFrame()
+
+
 def _write_language_to_config(lang: str) -> None:
     with open(_CONFIG_PATH) as f:
         content = f.read()
     if re.search(r"^UI_LANGUAGE\s*=", content, re.M):
-        content = re.sub(r'(?m)^(UI_LANGUAGE\s*=\s*)"[^"]*"', f'\\1"{lang}"', content)
+        content = re.sub(r'(?m)^(UI_LANGUAGE\s*=\s*)(["\'])[^"\']*\2', f'\\1"{lang}"', content)
     else:
         content = content.rstrip("\n") + f'\n\nUI_LANGUAGE = "{lang}"\n'
     with open(_CONFIG_PATH, "w") as f:
@@ -160,7 +170,11 @@ class _MainThreadBridge(NSObject):
         with self._lock:
             fns, self._queue = self._queue, []
         for fn in fns:
-            fn()
+            try:
+                fn()
+            except Exception:
+                # One failing UI update must not drop the ones queued after it.
+                logging.exception("UI update failed")
 
 
 _bridge: _MainThreadBridge | None = None
@@ -194,13 +208,6 @@ class _BridgeHandler(NSObject):
 
 _history = CorrectionHistory()
 _history_menu: NSMenu | None = None
-
-_STATUS_STEPS = [
-    (1.0,    "Préparation"),
-    (3.0,    "Appel à Gemini"),
-    (6.0,    "Réécriture en cours"),
-    (9999.0, "Finalisation"),
-]
 
 
 class _HistoryHandler(NSObject):
@@ -243,6 +250,7 @@ class _PrefsHandler(NSObject):
         dlg = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
             NSMakeRect(0, 0, 390, 160), style, NSBackingStoreBuffered, False,
         )
+        dlg.setReleasedWhenClosed_(False)  # reopened after its close button
         dlg.setTitle_(t("prefs_title"))
         dlg.setLevel_(NSFloatingWindowLevel)
         dlg.setCollectionBehavior_(_COLLECTION)
@@ -338,14 +346,10 @@ def show_accessibility_denied_alert() -> None:
     any thread — dispatches to the main thread internally."""
     def _show():
         alert = NSAlert.alloc().init()
-        alert.setMessageText_("Accessibility permission required")
-        alert.setInformativeText_(
-            "TextPolish needs Accessibility access to listen for the global "
-            "keyboard shortcut. Grant it in System Settings → Privacy & "
-            "Security → Accessibility, then restart TextPolish."
-        )
-        alert.addButtonWithTitle_("Open System Settings")
-        alert.addButtonWithTitle_("Cancel")
+        alert.setMessageText_(t("ax_title"))
+        alert.setInformativeText_(t("ax_text"))
+        alert.addButtonWithTitle_(t("ax_open"))
+        alert.addButtonWithTitle_(t("cancel"))
         if alert.runModal() == NSAlertFirstButtonReturn:
             url = NSURL.URLWithString_(
                 "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
@@ -366,7 +370,7 @@ class TextPolishPanel(NSObject):
             return None
         self._selected_text = ""
         self._app_ref = None
-        self._current_mode = "pro"
+        self._current_mode = "casual"
         self._parts: list[dict] = []
         self._t_job = 0.0
         self._job_runner = PolishJobRunner(on_main=_on_main)
@@ -455,7 +459,7 @@ class TextPolishPanel(NSObject):
     def _handle_js_message(self, body: dict):
         msg_type = body.get("type")
         if msg_type == "polish":
-            mode = body.get("mode", "pro")
+            mode = body.get("mode", "casual")
             instruction = body.get("instruction") or None
             self._current_mode = mode
             self._start_process(mode, custom_prompt=instruction)
@@ -525,26 +529,30 @@ class TextPolishPanel(NSObject):
         expose it, or the AX call fails) — see platforms/macos/ax_bounds.py.
         """
         bounds = get_selection_bounds()
-        screen = NSScreen.mainScreen()
-        if bounds is None or screen is None:
+        screens = NSScreen.screens()
+        if bounds is None or not screens:
             self._panel.center()
             return
 
         x, y, w, h = bounds
-        screen_frame = screen.frame()
         panel_w, panel_h = _PANEL_WIDTH, self._panel.frame().size.height
         gap = 8
 
-        # AX bounds use a top-left, Y-down origin; Cocoa screen coordinates
-        # use a bottom-left, Y-up origin.
-        origin_x = x
-        origin_y = screen_frame.size.height - (y + h) - panel_h - gap
-        if origin_y < 0:
-            # Not enough room below the selection — place it above instead.
-            origin_y = screen_frame.size.height - y + gap
+        # AX bounds are global with a top-left, Y-down origin on the primary
+        # screen; Cocoa uses bottom-left, Y-up. Flip with the primary height,
+        # then keep the panel on the screen that holds the selection.
+        primary_h = screens[0].frame().size.height
+        sel_top, sel_bottom = primary_h - y, primary_h - (y + h)
+        sf = _visible_frame_at(x, sel_bottom)
 
-        origin_x = max(0, min(origin_x, screen_frame.size.width - panel_w))
-        origin_y = max(0, min(origin_y, screen_frame.size.height - panel_h))
+        origin_x = x
+        origin_y = sel_bottom - panel_h - gap
+        if origin_y < sf.origin.y:
+            # Not enough room below the selection — place it above instead.
+            origin_y = sel_top + gap
+
+        origin_x = max(sf.origin.x, min(origin_x, sf.origin.x + sf.size.width - panel_w))
+        origin_y = max(sf.origin.y, min(origin_y, sf.origin.y + sf.size.height - panel_h))
         self._panel.setFrameOrigin_(NSMakePoint(origin_x, origin_y))
 
     @objc.python_method
@@ -560,7 +568,7 @@ class TextPolishPanel(NSObject):
         top = frame.origin.y + frame.size.height
         new_y = top - h if keep_top else frame.origin.y
         new_x = frame.origin.x
-        screen = NSScreen.mainScreen()
+        screen = self._panel.screen() or NSScreen.mainScreen()
         if screen is not None:
             sf = screen.visibleFrame()
             new_x = max(sf.origin.x, min(new_x, sf.origin.x + sf.size.width - _PANEL_WIDTH))
@@ -580,11 +588,9 @@ class TextPolishPanel(NSObject):
         self._t_job = time.perf_counter()
         self._job_runner.start(
             self._selected_text, mode, custom_prompt,
-            status_steps=_STATUS_STEPS,
             polish_fn=polish_text,
-            on_status=lambda m: self._js(f"App.setStatus({json.dumps(m)})"),
+            # The popup shows a reading animation, not the streamed tokens.
             on_stream_start=lambda: self._js("App.startStream()"),
-            on_token=lambda t: self._js(f"App.appendToken({json.dumps(t)})"),
             on_success=self._on_success,
             on_error=self._on_error,
         )

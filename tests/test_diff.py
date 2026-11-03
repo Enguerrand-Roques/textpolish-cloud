@@ -1,58 +1,21 @@
-from diff import compute_word_diff
+from diff import group_changes, apply_choices, classify_change, choose_layout
 
 
-class TestComputeWordDiff:
-    def test_identical_text_is_all_equal(self):
-        segments = compute_word_diff("hello world", "hello world")
-        assert segments == [{"text": "hello world", "op": "equal"}]
-
-    def test_pure_insertion(self):
-        segments = compute_word_diff("hello", "hello world")
-        assert segments[0] == {"text": "hello", "op": "equal"}
-        assert {"text": " world", "op": "insert"} in segments or \
-               {"text": "world", "op": "insert"} in segments
-        assert all(s["op"] != "delete" for s in segments)
-
-    def test_pure_deletion(self):
-        segments = compute_word_diff("hello world", "hello")
-        assert any(s["op"] == "delete" for s in segments)
-        assert all(s["op"] != "insert" for s in segments)
-
-    def test_replacement_produces_delete_then_insert(self):
-        segments = compute_word_diff("salut les gars", "salut les gens")
-        ops = [s["op"] for s in segments]
-        assert "delete" in ops
-        assert "insert" in ops
-        delete_idx = ops.index("delete")
-        insert_idx = ops.index("insert")
-        assert delete_idx < insert_idx
-
-    def test_punctuation_and_spacing_preserved(self):
-        segments = compute_word_diff("Bonjour, ca va?", "Bonjour, ça va ?")
-        rebuilt_original = "".join(
-            s["text"] for s in segments if s["op"] in ("equal", "delete")
-        )
-        rebuilt_corrected = "".join(
-            s["text"] for s in segments if s["op"] in ("equal", "insert")
-        )
-        assert rebuilt_original == "Bonjour, ca va?"
-        assert rebuilt_corrected == "Bonjour, ça va ?"
+class TestDiffEdges:
+    def test_identical_text_is_one_equal_part(self):
+        assert group_changes("hello world", "hello world") == [
+            {"op": "equal", "text": "hello world"}]
 
     def test_empty_strings(self):
-        assert compute_word_diff("", "") == []
+        assert group_changes("", "") == []
 
-    def test_empty_original_is_pure_insertion(self):
-        segments = compute_word_diff("", "new text")
-        assert all(s["op"] == "insert" for s in segments)
-        assert "".join(s["text"] for s in segments) == "new text"
-
-    def test_empty_corrected_is_pure_deletion(self):
-        segments = compute_word_diff("old text", "")
-        assert all(s["op"] == "delete" for s in segments)
-        assert "".join(s["text"] for s in segments) == "old text"
-
-
-from diff import group_changes, apply_choices, classify_change, choose_layout
+    def test_pure_insertion_and_deletion_round_trip(self):
+        for original, corrected in (("", "new text"), ("old text", ""),
+                                    ("hello", "hello world"), ("hello world", "hello")):
+            parts = group_changes(original, corrected)
+            ids = [p["id"] for p in parts if p["op"] == "change"]
+            assert apply_choices(parts, ids) == corrected
+            assert apply_choices(parts, []) == original
 
 
 def _changes(parts):
@@ -190,3 +153,18 @@ class TestCosmeticChanges:
         parts = group_changes("j'ai coment", "j\u2019ai comment")
         assert [(c["before"], c["after"]) for c in _changes(parts)] == [("coment", "comment")]
         assert apply_choices(parts, [0]) == "j'ai comment"
+
+
+class TestLayoutThresholds:
+    """Cards up to 3 fixes on up to 280 characters, the document view beyond."""
+
+    def _parts(self, n_changes):
+        return [{"op": "change", "id": i} for i in range(n_changes)]
+
+    def test_three_fixes_are_cards_four_are_a_document(self):
+        assert choose_layout(self._parts(3), "x" * 100) == "cards"
+        assert choose_layout(self._parts(4), "x" * 100) == "document"
+
+    def test_280_characters_are_cards_281_are_a_document(self):
+        assert choose_layout(self._parts(1), "x" * 280) == "cards"
+        assert choose_layout(self._parts(1), "x" * 281) == "document"

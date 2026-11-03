@@ -43,7 +43,7 @@ def _acquire_single_instance_lock():
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
-        print("TextPolish Cloud is already running — look for the ✏️ icon in the menu bar.")
+        print("TextPolish Cloud is already running — look for the pencil icon in the menu bar.")
         sys.exit(0)
     return lock
 

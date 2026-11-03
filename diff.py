@@ -1,11 +1,13 @@
-"""Word-level diff between the original and corrected text, used to render
-the strikethrough/highlight suggestion popup.
+"""Word-level diff between the original and corrected text, split into
+numbered corrections that the popup shows and the user accepts or ignores,
+each labelled with its kind (spelling, agreement, punctuation…).
 """
 
 import difflib
 import os
 import re
 import unicodedata
+from collections.abc import Iterable
 
 from i18n import t
 
@@ -16,30 +18,9 @@ def _tokenize(text: str) -> list[str]:
     return _TOKEN_RE.findall(text)
 
 
-def compute_word_diff(original: str, corrected: str) -> list[dict]:
-    """Returns segments: [{"text": str, "op": "equal"|"delete"|"insert"}, ...]"""
-    a, b = _tokenize(original), _tokenize(corrected)
-    sm = difflib.SequenceMatcher(a=a, b=b, autojunk=False)
-    segments: list[dict] = []
-    for tag, i1, i2, j1, j2 in sm.get_opcodes():
-        if tag == "equal":
-            segments.append({"text": "".join(a[i1:i2]), "op": "equal"})
-        elif tag == "delete":
-            segments.append({"text": "".join(a[i1:i2]), "op": "delete"})
-        elif tag == "insert":
-            segments.append({"text": "".join(b[j1:j2]), "op": "insert"})
-        elif tag == "replace":
-            segments.append({"text": "".join(a[i1:i2]), "op": "delete"})
-            segments.append({"text": "".join(b[j1:j2]), "op": "insert"})
-    return segments
-
-
 # ---------------------------------------------------------------------------
 # Corrections: the unit the popup shows and lets the user accept or ignore
 # ---------------------------------------------------------------------------
-
-# Kinds of fix; the label shown for each comes from i18n.py ("kind_<name>").
-KINDS = ("accent", "case", "punctuation", "spelling", "agreement", "conjugation", "grammar", "rewrite")
 
 _CARDS_MAX_CHANGES = 3
 _CARDS_MAX_CHARS = 280
@@ -55,11 +36,14 @@ _TYPO_EQUIV = str.maketrans({"\u2019": "'", "\u2018": "'", "\u201c": '"', "\u201
                               "\u00a0": " ", "\u202f": " ", "\u2009": " "})
 
 
+def _normalize_typography(s: str) -> str:
+    return " ".join(s.translate(_TYPO_EQUIV).split())
+
+
 def _is_cosmetic(before: str, after: str) -> bool:
     """True when two strings only differ by typographic quotes or spacing
     (e.g. ' vs ’, a non-breaking space before '?'). Not worth a suggestion."""
-    norm = lambda t: " ".join(t.translate(_TYPO_EQUIV).split())
-    return norm(before) == norm(after)
+    return _normalize_typography(before) == _normalize_typography(after)
 
 
 def _letters_only(s: str) -> str:
@@ -112,7 +96,7 @@ def classify_change(before: str, after: str) -> str:
         return "punctuation"
     if b.lower() == a.lower():
         return "case"
-    if b.lower().replace("’", "'") in _HOMOPHONES and a.lower().replace("’", "'") in _HOMOPHONES:
+    if b.lower().translate(_TYPO_EQUIV) in _HOMOPHONES and a.lower().translate(_TYPO_EQUIV) in _HOMOPHONES:
         return "grammar"
     if _strip_accents(b).lower() == _strip_accents(a).lower():
         return "accent"
@@ -183,7 +167,7 @@ def group_changes(original: str, corrected: str) -> list[dict]:
     return parts
 
 
-def apply_choices(parts: list[dict], accepted_ids) -> str:
+def apply_choices(parts: list[dict], accepted_ids: Iterable[int]) -> str:
     """Rebuild the text, keeping the correction for accepted ids and the
     original wording for the others."""
     accepted = set(accepted_ids)
@@ -197,7 +181,7 @@ def apply_choices(parts: list[dict], accepted_ids) -> str:
 
 
 def choose_layout(parts: list[dict], original: str, mode: str = "casual") -> str:
-    """'none' when nothing changed; 'rewrite' for Pro/Perso, where the model
+    """'none' when nothing changed; 'rewrite' for Pro and Custom, where the model
     rewrites the whole text and per-word cards would be noise; 'cards' for a
     few corrections on a short text (one card per fix, Grammarly-style);
     'document' otherwise."""

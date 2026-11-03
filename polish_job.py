@@ -40,14 +40,17 @@ class PolishJobRunner:
         mode: str,
         custom_prompt: str | None,
         *,
-        status_steps: list[StatusStep],
         polish_fn: Callable[..., str],
-        on_status: Callable[[str], None],
         on_stream_start: Callable[[], None],
-        on_token: Callable[[str], None],
         on_success: Callable[[str], None],
         on_error: Callable[[str], None],
+        status_steps: list[StatusStep] | None = None,
+        on_status: Callable[[str], None] | None = None,
+        on_token: Callable[[str], None] | None = None,
     ) -> None:
+        """Run *polish_fn* on a worker thread. Status messages (if
+        *status_steps* is given) and tokens are delivered on the main thread,
+        and dropped once a newer job has started."""
         self._status_job += 1
         job_id = self._status_job
         self._stream_job = job_id
@@ -77,7 +80,8 @@ class PolishJobRunner:
             except Exception as exc:
                 self._on_main(lambda e=exc, jid=job_id: self._finish(on_error, str(e), jid))
 
-        threading.Thread(target=status_worker, daemon=True).start()
+        if status_steps and on_status:
+            threading.Thread(target=status_worker, daemon=True).start()
         threading.Thread(target=worker, daemon=True).start()
 
     def _emit_status(self, job_id, message, on_status):
@@ -91,7 +95,8 @@ class PolishJobRunner:
             streaming_started["v"] = True
             self._status_job += 1
             on_stream_start()
-        on_token(token)
+        if on_token:
+            on_token(token)
 
     def _finish(self, callback, arg, job_id=None):
         # A newer job superseded this one: drop its result instead of letting

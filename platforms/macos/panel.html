@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="color-scheme" content="light dark">
@@ -133,7 +133,6 @@
     transition: color 0.2s;
   }
   .seg button.on { color: var(--label); font-weight: 600; }
-  .seg button .dot { width: 6px; height: 6px; border-radius: 50%; opacity: 0.9; }
   body[data-mode="pro"]    .seg .knob { transform: translateX(100%); }
   body[data-mode="custom"] .seg .knob { transform: translateX(200%); }
 
@@ -249,7 +248,6 @@
   .btn.plain { background: var(--fill); color: var(--label); }
   .btn.plain:hover { background: var(--fill-2); }
   .btn .key { font-size: 11px; opacity: 0.7; font-weight: 500; }
-  .btn.grow { flex: 1; justify-content: center; }
 
   /* Document */
   .doc { padding: 4px; }
@@ -275,7 +273,7 @@
   .legend span { display: flex; align-items: center; gap: 5px; }
   .legend i { width: 6px; height: 6px; border-radius: 50%; background: var(--k); }
 
-  /* Rewrite (Pro / Sur mesure): one suggestion for the whole text */
+  /* Rewrite (Pro / Custom): one suggestion for the whole text */
   .rw { padding: 12px 14px 10px; }
   .rw .head { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: var(--accent); }
   .rw .head i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
@@ -311,7 +309,7 @@
   kbd { font: 500 10.5px var(--font); color: var(--secondary); background: var(--fill); border-radius: 4px; padding: 1px 5px; }
 
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   }
 </style>
 </head>
@@ -389,6 +387,7 @@ let parts = [];          // [{op:"equal",text} | {op:"change",id,before,after,ki
 let changes = [];
 let layout = "none";
 let cursor = 0;          // current card
+let deciding = false;    // a card is animating out: ignore repeated ↵
 let accepted = new Set();
 let closeTimer = null;
 
@@ -404,7 +403,8 @@ function setPill(text, tone, spinning) {
 }
 function setFoot(html) { $("foot").innerHTML = html; }
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
-function plural(n, one, many) { return n + " " + (n > 1 ? many : one); }
+// French uses the singular for 0 and 1, English only for 1.
+function plural(n, one, many) { return n + " " + ((L === I18N.fr ? n > 1 : n !== 1) ? many : one); }
 
 // Report our natural height so the native panel can hug the content.
 let lastH = 0;
@@ -481,6 +481,7 @@ function applyLanguage(lang) {
   document.documentElement.lang = lang in I18N ? lang : "en";
   document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = L[el.dataset.i18n]; });
   $("instrInput").placeholder = L.placeholder;
+  $("instrInput").setAttribute("aria-label", L.placeholder);
   $("presets").innerHTML = L.presets
     .map(([label, instr]) => `<button data-instr="${esc(instr)}" onclick="preset(this.dataset.instr)">${esc(label)}</button>`).join("");
   $("rwCmp").textContent = L.compare;
@@ -492,7 +493,10 @@ function applyLanguage(lang) {
 function applyMode(m) {
   mode = m;
   document.body.dataset.mode = m;
-  document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
+  document.querySelectorAll(".seg button").forEach(b => {
+    b.classList.toggle("on", b.dataset.mode === m);
+    b.setAttribute("aria-selected", b.dataset.mode === m);
+  });
   $("modeHintTxt").textContent = L["hint_" + m];
 }
 function chooseMode(m) {
@@ -551,12 +555,15 @@ function renderCard(animate) {
 }
 function decide(ok) {
 
-  if (layout !== "cards" || cursor >= changes.length) return;
+  if (layout !== "cards" || deciding || cursor >= changes.length) return;
+  deciding = true;
   if (ok) accepted.add(changes[cursor].id);
   const card = $("stack").querySelector(".card");
   card.classList.remove("in");
   card.classList.add(ok ? "out-accept" : "out-ignore");
   setTimeout(() => {
+    deciding = false;
+    if (layout !== "cards") return;          // ⌘↵ accepted everything meanwhile
     cursor += 1;
     if (cursor < changes.length) renderCard(true); else finish();
   }, 190);
@@ -580,7 +587,7 @@ function renderDoc() {
     paintChange(p, s);
     el.appendChild(s);
   });
-  // One entry per kind of mistake (Conjugaison 5 · Accord 3 · …), most frequent
+  // One entry per kind of mistake (Conjugation 5 · Agreement 3 · …), most frequent
   // first; the dot color still groups them (red spelling, teal grammar…).
   const counts = {}, kindOf = {};
   changes.forEach(c => { const l = kindLabel(c.kind); counts[l] = (counts[l] || 0) + 1; kindOf[l] = c.kind; });
@@ -637,6 +644,7 @@ function stateView(badgeClass, icon, title, text, extra) {
   show("vState");
 }
 function finish() {
+  if (layout === "done") return;
   const n = accepted.size;
   layout = "done";
   if (!n) {
@@ -656,7 +664,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") { e.preventDefault(); send({ type: "close" }); return; }
   const ready = layout === "cards" || layout === "rewrite" || layout === "document";
   // ⌘↵ always means "replace my text", even with the cursor still in the
-  // Sur mesure field; plain ↵ there (re)runs the instruction.
+  // Custom field; plain ↵ there (re)runs the instruction.
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && (ready || !typing)) {
     e.preventDefault();
     if (layout === "cards" || layout === "rewrite") acceptAll(); else if (layout === "document") finish();
@@ -677,11 +685,13 @@ document.addEventListener("keydown", e => {
 window.App = {
   reset() {
     clearTimeout(closeTimer);
-    busy = false; parts = []; changes = []; layout = "none"; cursor = 0; accepted = new Set();
+    busy = false; parts = []; changes = []; layout = "none"; cursor = 0; deciding = false; accepted = new Set();
+    lastH = 0;  // Python resets the panel height on every open: report ours again
     $("instrInput").value = "";
     $("readTxt").textContent = "";
     setPill("", ""); setFoot("");
     show(null);
+    requestAnimationFrame(reportHeight);
   },
   setLanguage(lang) { applyLanguage(lang); },
   setSourceApp(name) { $("src").textContent = name ? L.in_app + " " + name : L.local_src; },
@@ -701,9 +711,7 @@ window.App = {
     setPill(mode === "casual" ? L.reading : L.rewriting, "", true);
     setFoot(`<span>${L.privacy_foot}</span><span class="right"><kbd>esc</kbd> ${L.close_key}</span>`);
   },
-  setStatus() {},
   startStream() { setPill(mode === "casual" ? L.reading : L.rewriting, "", true); },
-  appendToken() {},
   onDone() { busy = false; },
   setChanges(newParts, newLayout) {
     busy = false;
@@ -733,10 +741,9 @@ window.App = {
   onError(msg) {
     busy = false; layout = "error";
     stateView("orange", ICON.warn, L.failed, msg,
-      `<button class="btn plain" onclick="chooseMode(mode === 'custom' ? 'casual' : mode)">${L.retry}</button>`);
+      `<button class="btn plain" onclick="mode === 'custom' ? submitCustom() : chooseMode(mode)">${L.retry}</button>`);
     setPill(L.error, "orange"); setFoot(`<span class="right"><kbd>esc</kbd> ${L.close_key}</span>`);
   },
-  updateHistory() {},
 };
 applyMode("casual");
 applyLanguage(new URLSearchParams(location.search).get("lang") || "en");

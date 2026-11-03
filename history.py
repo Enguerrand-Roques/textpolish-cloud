@@ -28,8 +28,6 @@ class CorrectionHistory:
         return entry
 
 
-
-
 def format_menu_label(entry: dict, truncate: int = LABEL_TRUNCATE_CHARS) -> str:
     orig_short = entry["original"][:truncate].replace("\n", " ")
     if len(entry["original"]) > truncate:

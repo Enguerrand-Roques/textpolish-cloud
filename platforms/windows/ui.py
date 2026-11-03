@@ -21,6 +21,7 @@ from clipboard import get_app_and_copy, paste_text
 from llm import polish_text
 from history import CorrectionHistory, format_menu_label, format_tooltip
 from polish_job import PolishJobRunner
+from i18n import t
 
 
 # ---------------------------------------------------------------------------
@@ -53,12 +54,13 @@ def _on_main(fn):
 _history = CorrectionHistory()
 _history_menu: QMenu | None = None
 
-_STATUS_STEPS = [
-    (1.0,    "Preparing correction"),
-    (3.0,    "Calling Gemini"),
-    (6.0,    "Rewriting text"),
-    (9999.0, "Finalising response"),
-]
+def _status_steps() -> list[tuple[float, str]]:
+    return [
+        (1.0,    t("status_prepare")),
+        (3.0,    "Gemini"),
+        (6.0,    t("status_rewrite")),
+        (9999.0, t("status_finish")),
+    ]
 
 
 def _add_to_history(original: str, corrected: str, mode: str) -> None:
@@ -71,7 +73,7 @@ def _update_history_menu() -> None:
         return
     _history_menu.clear()
     if not _history.entries:
-        act = _history_menu.addAction("No corrections yet")
+        act = _history_menu.addAction(t("menu_empty"))
         act.setEnabled(False)
         return
     for entry in _history.entries:
@@ -168,12 +170,12 @@ class TextPolishPanel(QObject):
 
         # Buttons
         btn_row = QHBoxLayout()
-        self._btn_pro = QPushButton("Pro")
+        self._btn_pro = QPushButton(t("mode_pro"))
         self._btn_pro.clicked.connect(lambda: self._start_process("pro"))
-        self._btn_casual = QPushButton("Correction")
+        self._btn_casual = QPushButton(t("mode_casual"))
         self._btn_casual.setObjectName("primary")
         self._btn_casual.clicked.connect(lambda: self._start_process("casual"))
-        self._btn_custom = QPushButton("Custom")
+        self._btn_custom = QPushButton(t("mode_custom"))
         self._btn_custom.clicked.connect(self._open_custom_dialog)
         for btn in (self._btn_casual, self._btn_pro, self._btn_custom):
             btn_row.addWidget(btn)
@@ -223,7 +225,7 @@ class TextPolishPanel(QObject):
         self._set_status("Preparing correction.")
         self._job_runner.start(
             self._selected_text, mode, custom_prompt,
-            status_steps=_STATUS_STEPS,
+            status_steps=_status_steps(),
             polish_fn=polish_text,
             on_status=self._set_status,
             on_stream_start=self._on_stream_start,
@@ -257,7 +259,7 @@ class TextPolishPanel(QObject):
 
     def _open_custom_dialog(self):
         dlg = QDialog(self._panel)
-        dlg.setWindowTitle("Custom instruction")
+        dlg.setWindowTitle(t("custom_title"))
         dlg.setFixedSize(400, 200)
         dlg.setWindowFlags(
             dlg.windowFlags() | Qt.WindowType.WindowStaysOnTopHint
@@ -267,16 +269,16 @@ class TextPolishPanel(QObject):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
 
-        lbl = QLabel("Describe how to rewrite the text:")
+        lbl = QLabel(t("custom_label"))
         lbl.setFont(QFont("Segoe UI", 10))
         layout.addWidget(lbl)
 
         text_input = QTextEdit()
-        text_input.setText("Rewrite this text keeping my style, make it punchier.")
+        text_input.setText(t("custom_default"))
         text_input.setFont(QFont("Segoe UI", 10))
         layout.addWidget(text_input, stretch=1)
 
-        apply_btn = QPushButton("Apply")
+        apply_btn = QPushButton(t("apply"))
         apply_btn.setFixedWidth(110)
         layout.addWidget(apply_btn, alignment=Qt.AlignmentFlag.AlignHCenter)
 
@@ -314,15 +316,15 @@ def _create_tray(panel: TextPolishPanel) -> QSystemTrayIcon:
     menu = QMenu()
 
     # History submenu
-    history_menu = QMenu("History")
-    no_history = history_menu.addAction("No corrections yet")
+    history_menu = QMenu(t("menu_history"))
+    no_history = history_menu.addAction(t("menu_empty"))
     no_history.setEnabled(False)
     menu.addMenu(history_menu)
     _history_menu = history_menu
 
     menu.addSeparator()
 
-    quit_action = menu.addAction("Quit TextPolish Cloud")
+    quit_action = menu.addAction(t("menu_quit") + " Cloud")
     quit_action.triggered.connect(QApplication.instance().quit)
     tray.setContextMenu(menu)
     tray.show()
