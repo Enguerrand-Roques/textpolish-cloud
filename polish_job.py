@@ -66,7 +66,14 @@ class PolishJobRunner:
                     last = msg
                 time.sleep(_TICK_SECONDS)
 
+        first_token = {"v": True}
+
         def handle_token(token: str):
+            # Without on_token only the first token matters (it ends the
+            # status messages); skip the main-thread hop for the others.
+            if on_token is None and not first_token["v"]:
+                return
+            first_token["v"] = False
             self._on_main(
                 lambda t=token, jid=job_id: self._emit_token(
                     jid, t, streaming_started, on_stream_start, on_token

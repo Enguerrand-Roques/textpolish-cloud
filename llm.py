@@ -8,7 +8,7 @@ from google import genai
 from google.genai import types
 from google.genai import errors
 from config import GEMINI_API_KEY, GEMINI_MODEL
-from diff import keep_question_marks
+from diff import keep_sentence_marks
 
 try:
     from config import GEMINI_TIMEOUT
@@ -139,10 +139,10 @@ def polish_text(
     if "__" not in text:
         result = result.replace("__", "")
 
-    # Correction must not remove a question the user asked (same rule as
+    # Correction must not remove a question or exclamation (same rule as
     # the local version, where the model kept merging "soir ? on peut").
     if mode == "casual":
-        result = keep_question_marks(text, result)
+        result = keep_sentence_marks(text, result)
 
     logging.debug("Response received — %d chars", len(result))
     return result

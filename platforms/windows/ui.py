@@ -195,7 +195,7 @@ class TextPolishPanel(QObject):
             self._text_view.setText(self._selected_text)
             self._set_enabled(True)
         else:
-            self._text_view.setText("No text selected — select text first")
+            self._text_view.setText(t("no_selection"))
             self._set_enabled(False)
 
         self._set_status("")
@@ -222,7 +222,7 @@ class TextPolishPanel(QObject):
             return
         self._current_mode = mode
         self._set_enabled(False)
-        self._set_status("Preparing correction.")
+        self._set_status(t("status_prepare") + ".")
         self._job_runner.start(
             self._selected_text, mode, custom_prompt,
             status_steps=_status_steps(),

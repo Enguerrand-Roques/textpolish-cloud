@@ -30,22 +30,30 @@ _CONTEXT_WORDS = 4
 _KEPT_MARKS = set("?!")
 
 
-def keep_question_marks(original: str, corrected: str) -> str:
-    """Put back any "?" or "!" the model dropped without replacing it.
+def keep_sentence_marks(original: str, corrected: str) -> str:
+    """Put back a "?" or "!" the model dropped without replacing it.
 
     Small models sometimes merge "tu fais quoi ce soir ? on se voit" into one
     sentence. A correction should never remove the user's question or
-    exclamation: only deletions made of these marks (and spaces) are undone,
-    so a model that rewrites "?" into "." or moves it is left alone.
+    exclamation. Only deletions made of these marks (and spaces) are undone,
+    and only while the answer has fewer of that mark than the input, so a
+    "?" the model moved, turned into ".", or a "??" it reduced to "?" stays
+    as the model wrote it.
     """
     a, b = _tokenize(original), _tokenize(corrected)
     sm = difflib.SequenceMatcher(a=a, b=b, autojunk=False)
+    missing = {m: original.count(m) - corrected.count(m) for m in _KEPT_MARKS}
     out: list[str] = []
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         before, after = "".join(a[i1:i2]), "".join(b[j1:j2])
-        marks = before.strip()
-        dropped = (tag in ("delete", "replace") and marks and set(marks) <= _KEPT_MARKS | {" "}
-                   and not after.strip())
+        marks = before.replace(" ", "")
+        repeated = (i1 > 0 and a[i1 - 1] in _KEPT_MARKS) or (i2 < len(a) and a[i2] in _KEPT_MARKS)
+        dropped = (tag in ("delete", "replace") and marks and set(marks) <= _KEPT_MARKS
+                   and not after.strip() and not repeated
+                   and all(missing[m] >= marks.count(m) for m in set(marks)))
+        if dropped:
+            for m in marks:
+                missing[m] -= 1
         out.append(before if dropped else after)
     return "".join(out)
 

@@ -41,6 +41,7 @@ STRINGS = {
                    "Security → Accessibility, then restart TextPolish.",
         "ax_open": "Open System Settings",
         # Windows panel (experimental)
+        "no_selection": "No text selected — select text first",
         "status_prepare": "Preparing correction",
         "status_load": "Loading local model",
         "status_rewrite": "Rewriting text",
@@ -78,6 +79,7 @@ STRINGS = {
                    "Confidentialité et sécurité → Accessibilité, puis relancez TextPolish.",
         "ax_open": "Ouvrir Réglages Système",
         # Windows panel (experimental)
+        "no_selection": "Aucun texte sélectionné — sélectionnez d'abord du texte",
         "status_prepare": "Préparation de la correction",
         "status_load": "Chargement du modèle local",
         "status_rewrite": "Réécriture du texte",
