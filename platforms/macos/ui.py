@@ -66,6 +66,7 @@ import i18n
 from i18n import LANGUAGES, t
 from polish_job import PolishJobRunner
 import diff
+import languagetool
 from diff import group_changes, apply_choices, choose_layout
 from platforms.macos.spelling import is_word
 from platforms.macos.ax_bounds import get_selection_bounds
@@ -366,6 +367,16 @@ def show_accessibility_denied_alert() -> None:
 # Main panel
 # ---------------------------------------------------------------------------
 
+def _polish_then_check(text, mode, custom_prompt, on_token=None):
+    """The model's answer, then (Correction only) LanguageTool's rule-based
+    fixes on top of it, if installed. Runs on the worker thread. Returns the
+    text and the ranges LanguageTool rewrote (applied by default)."""
+    result = polish_text(text, mode, custom_prompt, on_token=on_token)
+    if mode != "casual":
+        return result, []
+    return languagetool.improve(result, detect_language(text))
+
+
 class TextPolishPanel(NSObject):
 
     def init(self):
@@ -598,7 +609,7 @@ class TextPolishPanel(NSObject):
         self._t_job = time.perf_counter()
         self._job_runner.start(
             self._selected_text, mode, custom_prompt,
-            polish_fn=polish_text,
+            polish_fn=_polish_then_check,
             # The popup shows a reading animation, not the streamed tokens.
             on_stream_start=lambda: self._js("App.startStream()"),
             on_success=self._on_success,
@@ -606,12 +617,13 @@ class TextPolishPanel(NSObject):
         )
 
     @objc.python_method
-    def _on_success(self, result: str):
+    def _on_success(self, outcome: tuple[str, list[tuple[int, int]]]):
+        result, rule_ranges = outcome
         self._js("App.onDone()")
         # Real-word swaps are held for review, checked in the text's language.
         lang = detect_language(self._selected_text)
         diff.set_word_checker(lambda w: is_word(w, lang))
-        self._parts = group_changes(self._selected_text, result)
+        self._parts = group_changes(self._selected_text, result, rule_ranges)
         layout = choose_layout(self._parts, self._selected_text, self._current_mode)
         logging.info("%s ready in %.0f ms: %s, %d change(s)", self._current_mode,
                      (time.perf_counter() - self._t_job) * 1000, layout,

@@ -298,20 +298,28 @@ def _head_words(text: str, n: int) -> str:
     return (head + "…") if len(words) > n else head
 
 
-def group_changes(original: str, corrected: str) -> list[dict]:
+def group_changes(original: str, corrected: str,
+                  trusted: Iterable[tuple[int, int]] = ()) -> list[dict]:
     """Split the diff into parts: unchanged text and numbered corrections.
 
     Returns [{"op": "equal", "text"} | {"op": "change", "id", "before",
     "after", "kind", "label", "review", "context_before", "context_after"}, ...].
-    "review" marks a fix that is shown but not applied by default (needs_review).
+    "review" marks a fix that is shown but not applied by default (needs_review),
+    except inside *trusted* ranges of *corrected* (fixes made by LanguageTool).
     Concatenating "before" (or "text") gives back *original*; concatenating
     "after" (or "text") gives back *corrected*.
     """
     a, b = _tokenize(original), _tokenize(corrected)
     sm = difflib.SequenceMatcher(a=a, b=b, autojunk=False)
+    trusted = list(trusted)
+    offsets = [0]  # offsets[j] = position of token j in *corrected*
+    for token in b:
+        offsets.append(offsets[-1] + len(token))
     parts: list[dict] = []
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         before, after = "".join(a[i1:i2]), "".join(b[j1:j2])
+        start, end = offsets[j1], offsets[j2]
+        by_rule = any(lo <= end and start <= hi for lo, hi in trusted)
         if tag == "equal" or _is_cosmetic(before, after):
             # Cosmetic-only differences keep the user's original characters.
             if parts and parts[-1]["op"] == "equal":
@@ -322,7 +330,7 @@ def group_changes(original: str, corrected: str) -> list[dict]:
             kind = classify_change(before, after)
             parts.append({"op": "change", "id": 0, "before": before, "after": after,
                           "kind": kind, "label": t("kind_" + kind),
-                          "review": needs_review(before, after, kind)})
+                          "review": not by_rule and needs_review(before, after, kind)})
 
     change_no = 0
     for i, p in enumerate(parts):

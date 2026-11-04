@@ -22,6 +22,7 @@ from AppKit import (
     NSEventMaskAny,
 )
 
+import languagetool
 from config import SHORTCUT
 from platforms.macos.hotkey import install as install_hotkey
 from platforms.macos.ui import setup as setup_panel, show_accessibility_denied_alert
@@ -55,6 +56,7 @@ def main() -> None:
     NSApp.finishLaunching()
 
     panel = setup_panel()
+    languagetool.warm_up()  # optional second pass; no-op if not installed
     install_hotkey(
         SHORTCUT, panel.trigger_polish,
         on_permission_denied=show_accessibility_denied_alert,
