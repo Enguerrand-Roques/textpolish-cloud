@@ -517,7 +517,9 @@ class TextPolishPanel(NSObject):
         self._position_near_selection()
         self._panel.setAlphaValue_(0.0)
         self._panel.makeKeyAndOrderFront_(None)
-        self._panel.animator().setAlphaValue_(1.0)
+        # Fade in once WebKit has painted the reset page, so the previous
+        # result never flashes on screen.
+        self.performSelector_withObject_afterDelay_("fadeIn:", None, 0.12)
         if has_text:
             self._start_process(self._current_mode)
 
@@ -578,7 +580,11 @@ class TextPolishPanel(NSObject):
 
     @objc.python_method
     def _hide(self):
+        self._js("App.reset()")  # clear it now; WebKit repaints before the next open
         self._panel.orderOut_(None)
+
+    def fadeIn_(self, _):
+        self._panel.animator().setAlphaValue_(1.0)
 
     @objc.python_method
     def _start_process(self, mode: str, custom_prompt: str | None = None):
