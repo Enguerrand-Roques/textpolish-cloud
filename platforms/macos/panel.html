@@ -219,6 +219,8 @@
 
   .kind { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: var(--k); }
   .kind i { width: 7px; height: 7px; border-radius: 50%; background: var(--k); }
+  .kind .check { font-weight: 600; font-size: 10.5px; padding: 1px 6px; border-radius: 999px;
+                 color: var(--orange); background: color-mix(in srgb, var(--orange) 14%, transparent); }
   .kind .count { margin-left: auto; font-weight: 500; color: var(--tertiary); font-variant-numeric: tabular-nums; }
   [data-kind="spelling"], [data-kind="accent"], [data-kind="case"] { --k: var(--red); }
   [data-kind="agreement"], [data-kind="conjugation"], [data-kind="grammar"] { --k: var(--teal); }
@@ -267,6 +269,8 @@
     background: transparent; box-shadow: none; color: var(--secondary);
     text-decoration: underline dotted var(--tertiary); text-underline-offset: 3px;
   }
+  /* A fix held for review: not applied until clicked, outlined in orange. */
+  .chg.review.off { color: var(--label); text-decoration: underline dashed var(--orange); text-underline-offset: 3px; }
   .chg.del { text-decoration: line-through; text-decoration-color: var(--k); color: var(--secondary); }
   .chg.gap::after { content: "＋"; font-size: 10px; color: var(--tertiary); }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; white-space: nowrap; padding: 8px 12px 6px; border-top: 0.5px solid var(--separator); font-size: 11px; color: var(--secondary); }
@@ -429,6 +433,7 @@ const I18N = {
     add: "Add", remove: "Remove", accept: "Accept", ignore: "Ignore", of: "of",
     correction: ["fix", "fixes"], accept_all: "Accept all", ignore_key: "ignore", close_key: "close",
     doc_hint: "Click a fix to ignore it", kept: ["kept", "kept"], apply: "Apply", close: "Close",
+    check: "Check", to_check: ["fix to check: click it to apply", "fixes to check: click to apply"],
     before: "before", compare: "Compare", hide: "Hide",
     your_request: "Your request", pro_version: "Professional version", ready: "Ready",
     cancel: "Cancel", replace: "Replace",
@@ -457,6 +462,7 @@ const I18N = {
     add: "Ajouter", remove: "Supprimer", accept: "Accepter", ignore: "Ignorer", of: "sur",
     correction: ["correction", "corrections"], accept_all: "Tout accepter", ignore_key: "ignorer", close_key: "fermer",
     doc_hint: "Clique une correction pour l'ignorer", kept: ["retenue", "retenues"], apply: "Appliquer", close: "Fermer",
+    check: "À vérifier", to_check: ["correction à vérifier : clique pour l'appliquer", "corrections à vérifier : clique pour les appliquer"],
     before: "avant", compare: "Comparer", hide: "Masquer",
     your_request: "Selon ta demande", pro_version: "Version professionnelle", ready: "Prêt",
     cancel: "Annuler", replace: "Remplacer",
@@ -540,7 +546,7 @@ function renderCard(animate) {
   const c = changes[cursor];
   stack.innerHTML = `
     <article class="card surface ${animate ? "in" : ""}" data-kind="${c.kind}">
-      <div class="kind"><i></i>${esc(kindLabel(c.kind))}<span class="count">${cursor + 1} ${L.of} ${changes.length}</span></div>
+      <div class="kind"><i></i>${esc(kindLabel(c.kind))}${c.review ? `<span class="check">${L.check}</span>` : ""}<span class="count">${cursor + 1} ${L.of} ${changes.length}</span></div>
       <div class="swap">${swapHTML(c)}</div>
       ${(c.context_before || c.context_after) ? `<div class="ctx">${ctxHTML(c)}</div>` : ""}
       <div class="actions">
@@ -569,7 +575,9 @@ function decide(ok) {
   }, 190);
 }
 function acceptAll() {
-  changes.forEach(c => accepted.add(c.id));
+  // In cards, "accept all" leaves out the fixes held for review: they are
+  // only applied one by one. A Pro or Custom rewrite is accepted whole.
+  changes.forEach(c => { if (layout !== "cards" || !c.review) accepted.add(c.id); });
   finish();
 }
 
@@ -580,9 +588,10 @@ function renderDoc() {
   parts.forEach(p => {
     if (p.op === "equal") { el.appendChild(document.createTextNode(p.text)); return; }
     const s = document.createElement("span");
-    s.className = "chg";
+    s.className = "chg" + (p.review ? " review" : "");
     s.dataset.kind = p.kind;
-    s.title = kindLabel(p.kind) + (p.before.trim() ? ` — ${L.before}: “${p.before.trim()}”` : "");
+    s.title = (p.review ? L.check + " · " : "") + kindLabel(p.kind)
+      + (p.before.trim() ? ` — ${L.before}: “${p.before.trim()}”` : "");
     s.onclick = () => toggleChange(p, s);
     paintChange(p, s);
     el.appendChild(s);
@@ -611,7 +620,10 @@ function toggleChange(p, s) {
 function updateDocChrome() {
   const n = accepted.size;
   setPill(plural(changes.length, ...L.correction), "accent");
-  setFoot(`<span>${n === changes.length ? L.doc_hint : plural(n, ...L.kept) + " " + L.of + " " + changes.length}</span>
+  const held = changes.filter(c => c.review && !accepted.has(c.id)).length;
+  const hint = held ? plural(held, ...L.to_check)
+    : n === changes.length ? L.doc_hint : plural(n, ...L.kept) + " " + L.of + " " + changes.length;
+  setFoot(`<span>${hint}</span>
     <span class="right"></span>
     <button class="btn primary" onclick="finish()">${n ? L.apply : L.close} <span class="key">⌘↵</span></button>`);
 }
@@ -718,7 +730,8 @@ window.App = {
     parts = newParts;
     changes = parts.filter(p => p.op === "change");
     layout = newLayout; cursor = 0;
-    accepted = new Set(newLayout === "document" ? changes.map(c => c.id) : []);
+    // Fixes held for review start unapplied in the document view.
+    accepted = new Set(newLayout === "document" ? changes.filter(c => !c.review).map(c => c.id) : []);
     if (newLayout === "none" && mode === "casual") {
       // No auto-close: the next step is often "make it more formal" or "translate it".
       stateView("green", ICON.check, L.no_mistakes, L.no_mistakes_text,

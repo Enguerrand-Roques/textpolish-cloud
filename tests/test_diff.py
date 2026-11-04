@@ -194,3 +194,85 @@ class TestKeepQuestionMarks:
     def test_repeated_marks_may_be_reduced(self):
         assert keep_sentence_marks("Vraiment ??", "Vraiment ?") == "Vraiment ?"
         assert keep_sentence_marks("Super !!!", "Super !") == "Super !"
+
+
+from diff import default_accepted, needs_review
+
+
+class TestReview:
+    """Fixes that changed the meaning in Round 7 are held for review."""
+
+    def _review(self, original, corrected):
+        return [(p["before"], p["review"]) for p in group_changes(original, corrected) if p["op"] == "change"]
+
+    def test_known_kinds_of_mistake_are_applied(self):
+        assert self._review("Les enfant sont fatigué", "Les enfants sont fatigués") == [
+            ("enfant", False), ("fatigué", False)]
+
+    def test_rewording_is_held(self):
+        assert self._review("Can you borrow me your pen?", "Can you borrow my pen?") == [("me your", True)]
+
+    def test_removed_punctuation_is_held(self):
+        assert self._review("Great job, everyone!", "Great job everyone!") == [(",", True)]
+
+    def test_informal_words_are_held(self):
+        parts = group_changes("Jsuis dispo demain aprem", "Je suis dispo demain après")
+        assert all(p["review"] for p in parts if p["op"] == "change")
+        assert apply_choices(parts, default_accepted(parts)) == "Jsuis dispo demain aprem"
+
+    def test_review_is_a_pure_function(self):
+        assert needs_review("teh", "the", "spelling") is False
+        assert needs_review("u", "you", "spelling") is True
+
+
+class TestReviewWithDictionary:
+    """With a word list, swapping one real word for another is held."""
+
+    WORDS = {"there", "the", "est", "es", "lui", "fout", "et", "les", "enfants", "was", "were"}
+
+    def setup_method(self):
+        import diff
+        diff.set_word_checker(lambda w: w.lower() in self.WORDS)
+
+    def teardown_method(self):
+        import diff
+        diff.set_word_checker(None)
+
+    def test_real_word_swap_is_held(self):
+        assert needs_review("there", "the", "spelling") is True
+        assert needs_review("lui", "fout", "spelling") is True
+
+    def test_known_confusion_between_real_words_is_applied(self):
+        assert needs_review("was", "were", "grammar") is False
+        assert needs_review("est", "es", "spelling") is False
+
+    def test_typo_is_applied(self):
+        assert needs_review("tomorow", "tomorrow", "spelling") is False
+
+    def test_unknown_word_swap_is_held_known_homophone_is_not(self):
+        assert needs_review("lui", "fout", "grammar") is True
+        assert needs_review("et", "est", "grammar") is False
+
+    def test_removed_apostrophe_is_held(self):
+        assert needs_review("I'm", "Im", "punctuation") is True
+        assert needs_review("Im", "I'm", "punctuation") is False
+
+    def test_wrong_plural_apostrophe_is_fixed_needed_one_is_kept(self):
+        assert needs_review("apple's", "apples", "punctuation") is False
+        assert needs_review("I'm", "Im", "punctuation") is True
+
+    def test_misspelt_word_is_fixed_even_without_a_known_pair(self):
+        assert needs_review("runned", "ran", "grammar") is False
+
+    def test_french_verb_adjective_confusion_is_known(self):
+        assert needs_review("intéressent", "intéressant", "spelling") is False
+
+
+class TestRepeatedWord:
+    def test_repeated_word_deletion_is_applied(self):
+        parts = group_changes("Can you send me the the report?", "Can you send me the report?")
+        assert [p["review"] for p in parts if p["op"] == "change"] == [False]
+
+    def test_other_word_deletion_is_held(self):
+        parts = group_changes("He made me to wait", "He made me wait")
+        assert [p["review"] for p in parts if p["op"] == "change"] == [True]

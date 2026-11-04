@@ -59,13 +59,17 @@ from AppKit import (
 from WebKit import WKWebView, WKWebViewConfiguration, WKUserContentController
 
 from clipboard import get_app_and_copy, paste_text
+from language import detect_language
 from llm import polish_text
 from history import CorrectionHistory, format_menu_label, format_tooltip
 import i18n
 from i18n import LANGUAGES, t
 from polish_job import PolishJobRunner
+import diff
 from diff import group_changes, apply_choices, choose_layout
+from platforms.macos.spelling import is_word
 from platforms.macos.ax_bounds import get_selection_bounds
+
 
 _CONFIG_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "config.py")
@@ -604,6 +608,9 @@ class TextPolishPanel(NSObject):
     @objc.python_method
     def _on_success(self, result: str):
         self._js("App.onDone()")
+        # Real-word swaps are held for review, checked in the text's language.
+        lang = detect_language(self._selected_text)
+        diff.set_word_checker(lambda w: is_word(w, lang))
         self._parts = group_changes(self._selected_text, result)
         layout = choose_layout(self._parts, self._selected_text, self._current_mode)
         logging.info("%s ready in %.0f ms: %s, %d change(s)", self._current_mode,
